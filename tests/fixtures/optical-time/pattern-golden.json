@@ -1,0 +1,143 @@
+{
+  "note": "Generated from the extraction source. Both repositories assert against this file.",
+  "source": {
+    "repository": "kubohiroya/turbowarp-realtime-motion-capture",
+    "path": "src/frame-sync/pattern.ts",
+    "commit": "051d0c7cec41b2709af1918509e468f3d7ca77ba"
+  },
+  "profile": {
+    "id": "twtss.pattern.v1",
+    "columns": 4,
+    "rows": 4,
+    "cellCount": 16,
+    "dataBits": 12,
+    "checkBits": 4,
+    "stepUs": 1000,
+    "codeCount": 4096,
+    "wrapUs": 4096000
+  },
+  "checkBitsSha256": "d5f99773a4cffd31d167d827f25b8ed7f41be1292d75b457e37899a701c656e2",
+  "cellsSha256": "47691a84b3be2efa97829617c2afe0f0f4a23107ffe213a7af524e4a44cd1f1a",
+  "undetectedDataErrorPatterns": 255,
+  "samples": [
+    {
+      "code": 0,
+      "check": 10,
+      "cells": "0000000000001010"
+    },
+    {
+      "code": 1,
+      "check": 11,
+      "cells": "0000000000011011"
+    },
+    {
+      "code": 42,
+      "check": 2,
+      "cells": "0000001010100010"
+    },
+    {
+      "code": 2047,
+      "check": 13,
+      "cells": "0111111111111101"
+    },
+    {
+      "code": 2048,
+      "check": 2,
+      "cells": "1000000000000010"
+    },
+    {
+      "code": 4094,
+      "check": 4,
+      "cells": "1111111111100100"
+    },
+    {
+      "code": 4095,
+      "check": 5,
+      "cells": "1111111111110101"
+    }
+  ],
+  "timestamps": [
+    {
+      "timestampUs": 0,
+      "code": 0
+    },
+    {
+      "timestampUs": 1,
+      "code": 0
+    },
+    {
+      "timestampUs": 999,
+      "code": 0
+    },
+    {
+      "timestampUs": 1000,
+      "code": 1
+    },
+    {
+      "timestampUs": 1001,
+      "code": 1
+    },
+    {
+      "timestampUs": 4095999,
+      "code": 4095
+    },
+    {
+      "timestampUs": 4096000,
+      "code": 0
+    },
+    {
+      "timestampUs": 4096001,
+      "code": 0
+    },
+    {
+      "timestampUs": 8192000,
+      "code": 0
+    },
+    {
+      "timestampUs": 1737000000000000,
+      "code": 2560
+    },
+    {
+      "timestampUs": -1,
+      "code": 4095
+    },
+    {
+      "timestampUs": -1000,
+      "code": 4095
+    },
+    {
+      "timestampUs": -4096000,
+      "code": 0
+    }
+  ],
+  "decode": [
+    {
+      "cells": "0000000000001010",
+      "code": 0
+    },
+    {
+      "cells": "0000000000011011",
+      "code": 1
+    },
+    {
+      "cells": "0111111111111101",
+      "code": 2047
+    },
+    {
+      "cells": "1111111111110101",
+      "code": 4095
+    },
+    {
+      "cells": "?000000000001010",
+      "code": null
+    },
+    {
+      "cells": "0000000000001011",
+      "code": null
+    },
+    {
+      "cells": "000000000000101",
+      "code": null
+    }
+  ]
+}
