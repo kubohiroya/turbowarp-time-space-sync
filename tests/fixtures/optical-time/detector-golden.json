@@ -1,0 +1,167 @@
+{
+  "note": "Generated from the extraction source. Geometry and sampling must not change across the move.",
+  "source": {
+    "repository": "kubohiroya/turbowarp-realtime-motion-capture",
+    "path": "src/frame-sync/detector.ts",
+    "commit": "051d0c7cec41b2709af1918509e468f3d7ca77ba"
+  },
+  "scene": {
+    "width": 96,
+    "height": 72,
+    "background": 12,
+    "light": 220,
+    "dark": 18,
+    "panel": {
+      "x": 24,
+      "y": 12,
+      "width": 48,
+      "height": 48
+    },
+    "codes": [
+      0,
+      1,
+      2,
+      4,
+      8,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      2048,
+      4095,
+      1234,
+      2730
+    ]
+  },
+  "detectedPanel": {
+    "x": 24,
+    "y": 12,
+    "width": 48,
+    "height": 48
+  },
+  "cellRects": [
+    {
+      "x": 27,
+      "y": 15,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 39,
+      "y": 15,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 51,
+      "y": 15,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 63,
+      "y": 15,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 27,
+      "y": 27,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 39,
+      "y": 27,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 51,
+      "y": 27,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 63,
+      "y": 27,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 27,
+      "y": 39,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 39,
+      "y": 39,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 51,
+      "y": 39,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 63,
+      "y": 39,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 27,
+      "y": 51,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 39,
+      "y": 51,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 51,
+      "y": 51,
+      "width": 6,
+      "height": 6
+    },
+    {
+      "x": 63,
+      "y": 51,
+      "width": 6,
+      "height": 6
+    }
+  ],
+  "sample": {
+    "code": 1234,
+    "values": [
+      18,
+      220,
+      18,
+      18,
+      220,
+      220,
+      18,
+      220,
+      18,
+      18,
+      220,
+      18,
+      18,
+      18,
+      18,
+      220
+    ]
+  },
+  "contrast": 202,
+  "decodedSample": 1234,
+  "frameCountForDetection": 16
+}
