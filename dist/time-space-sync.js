@@ -430,7 +430,25 @@
   	dataBits: 12,
   	checkBits: 4,
   	stepUs: 1e3,
-  	encoding: "absolute"
+  	encoding: "absolute",
+  	sampling: "grid",
+  	fiducials: []
+  });
+  Object.freeze({
+  	id: "twtss.pattern.v2",
+  	columns: 6,
+  	rows: 6,
+  	dataBits: 12,
+  	checkBits: 4,
+  	stepUs: 1e3,
+  	encoding: "differential",
+  	sampling: "quad",
+  	fiducials: Object.freeze([
+  		0,
+  		5,
+  		30,
+  		35
+  	])
   });
   function cellCount(profile) {
   	return profile.columns * profile.rows;
@@ -452,12 +470,18 @@
   function cellsPerBit(profile) {
   	return profile.encoding === "differential" ? 2 : 1;
   }
+  /** Cells available to the encoding, once the fiducials have taken theirs. */
+  function dataCellCount(profile) {
+  	return cellCount(profile) - profile.fiducials.length;
+  }
   function requireUsableProfile(profile) {
   	const needed = (profile.dataBits + profile.checkBits) * cellsPerBit(profile);
   	if (profile.columns < 1 || profile.rows < 1) throw new TimeSpaceSyncError("invalid-payload", "A pattern needs at least one cell.");
   	if (profile.dataBits < 1 || profile.checkBits < 1) throw new TimeSpaceSyncError("invalid-payload", "A pattern needs both data and check bits.");
   	if (profile.stepUs < 1 || !Number.isSafeInteger(profile.stepUs)) throw new TimeSpaceSyncError("invalid-payload", "The pattern step must be whole microseconds.");
-  	if (needed > cellCount(profile)) throw new TimeSpaceSyncError("invalid-payload", `The ${profile.columns}x${profile.rows} grid holds ${cellCount(profile)} cells but the encoding needs ${needed}.`);
+  	for (const index of profile.fiducials) if (!Number.isInteger(index) || index < 0 || index >= cellCount(profile)) throw new TimeSpaceSyncError("invalid-payload", `Fiducial cell ${index} is outside the ${profile.columns}x${profile.rows} grid.`);
+  	if (new Set(profile.fiducials).size !== profile.fiducials.length) throw new TimeSpaceSyncError("invalid-payload", "Fiducial cells must be distinct.");
+  	if (needed > dataCellCount(profile)) throw new TimeSpaceSyncError("invalid-payload", `The ${profile.columns}x${profile.rows} grid leaves ${dataCellCount(profile)} cells for data but the encoding needs ${needed}.`);
   	return profile;
   }
   /**
@@ -512,13 +536,13 @@
   	const bits = [];
   	for (let index = 0; index < profile.dataBits; index += 1) bits.push(bitAt(normalized, profile.dataBits - 1 - index));
   	for (let index = 0; index < profile.checkBits; index += 1) bits.push(bitAt(check, profile.checkBits - 1 - index));
-  	const cells = [];
+  	const payload = [];
   	for (const bit of bits) {
-  		cells.push(bit);
-  		if (profile.encoding === "differential") cells.push(!bit);
+  		payload.push(bit);
+  		if (profile.encoding === "differential") payload.push(!bit);
   	}
-  	while (cells.length < cellCount(profile)) cells.push(false);
-  	return cells;
+  	while (payload.length < dataCellCount(profile)) payload.push(false);
+  	return layOut(payload, profile);
   }
   /**
   * Rebuilds the code from cell states.
@@ -531,10 +555,13 @@
   function decodePatternCells(cells, profile) {
   	requireUsableProfile(profile);
   	if (cells.length !== cellCount(profile)) return void 0;
+  	const fiducials = new Set(profile.fiducials);
+  	for (const index of fiducials) if (cells[index] !== true) return void 0;
+  	const payload = cells.filter((_, index) => !fiducials.has(index));
   	const stride = cellsPerBit(profile);
   	const bits = [];
   	for (let index = 0; index < profile.dataBits + profile.checkBits; index += 1) {
-  		const bit = readBit(cells, index * stride, profile);
+  		const bit = readBit(payload, index * stride, profile);
   		if (bit === void 0) return void 0;
   		bits.push(bit);
   	}
@@ -551,12 +578,120 @@
   	if (cell === void 0 || opposite === void 0) return void 0;
   	return cell === opposite ? void 0 : cell;
   }
+  /** Places the payload cells around the fiducials, in row-major order. */
+  function layOut(payload, profile) {
+  	const fiducials = new Set(profile.fiducials);
+  	const cells = [];
+  	let next = 0;
+  	for (let index = 0; index < cellCount(profile); index += 1) {
+  		if (fiducials.has(index)) {
+  			cells.push(true);
+  			continue;
+  		}
+  		cells.push(payload[next] === true);
+  		next += 1;
+  	}
+  	return cells;
+  }
   function normalizeCode(code, profile) {
   	const count = codeCount(profile);
   	return (Math.trunc(code) % count + count) % count;
   }
   function bitAt(value, bit) {
   	return (value >> bit & 1) === 1;
+  }
+  //#endregion
+  //#region src/optical-time/homography.ts
+  /**
+  * The map taking the unit square onto a quadrilateral.
+  *
+  * Closed form rather than a least-squares fit: four correspondences determine a
+  * homography exactly, so there is nothing to minimise and no iteration to
+  * converge.
+  */
+  function homographyFromUnitSquare(quad) {
+  	const [p0, p1, p2, p3] = quad;
+  	const dx1 = p1.x - p2.x;
+  	const dx2 = p3.x - p2.x;
+  	const dy1 = p1.y - p2.y;
+  	const dy2 = p3.y - p2.y;
+  	const sx = p0.x - p1.x + p2.x - p3.x;
+  	const sy = p0.y - p1.y + p2.y - p3.y;
+  	if (sx === 0 && sy === 0) return [
+  		p1.x - p0.x,
+  		p2.x - p1.x,
+  		p0.x,
+  		p1.y - p0.y,
+  		p2.y - p1.y,
+  		p0.y,
+  		0,
+  		0,
+  		1
+  	];
+  	const denominator = dx1 * dy2 - dx2 * dy1;
+  	if (denominator === 0) return [];
+  	const g = (sx * dy2 - dx2 * sy) / denominator;
+  	const h = (dx1 * sy - sx * dy1) / denominator;
+  	return [
+  		p1.x - p0.x + g * p1.x,
+  		p3.x - p0.x + h * p3.x,
+  		p0.x,
+  		p1.y - p0.y + g * p1.y,
+  		p3.y - p0.y + h * p3.y,
+  		p0.y,
+  		g,
+  		h,
+  		1
+  	];
+  }
+  function applyHomography(homography, x, y) {
+  	if (homography.length !== 9) return void 0;
+  	const w = at(homography, 6) * x + at(homography, 7) * y + at(homography, 8);
+  	if (w === 0 || !Number.isFinite(w)) return void 0;
+  	return {
+  		x: (at(homography, 0) * x + at(homography, 1) * y + at(homography, 2)) / w,
+  		y: (at(homography, 3) * x + at(homography, 4) * y + at(homography, 5)) / w
+  	};
+  }
+  /**
+  * The four extreme corners of a set of points, in unit-square order.
+  *
+  * Picked by the two diagonal sums rather than by a bounding box, so a panel the
+  * camera sees rotated keeps its own corners instead of acquiring the corners of
+  * the box around it.
+  */
+  function cornersOf(points) {
+  	if (points.length < 4) return void 0;
+  	let topLeft = points[0];
+  	let topRight = points[0];
+  	let bottomRight = points[0];
+  	let bottomLeft = points[0];
+  	for (const point of points) {
+  		if (point.x + point.y < topLeft.x + topLeft.y) topLeft = point;
+  		if (point.x - point.y > topRight.x - topRight.y) topRight = point;
+  		if (point.x + point.y > bottomRight.x + bottomRight.y) bottomRight = point;
+  		if (point.x - point.y < bottomLeft.x - bottomLeft.y) bottomLeft = point;
+  	}
+  	const quad = [
+  		topLeft,
+  		topRight,
+  		bottomRight,
+  		bottomLeft
+  	];
+  	return quadArea(quad) > 0 ? quad : void 0;
+  }
+  /** Twice the signed area; positive for corners in the expected order. */
+  function quadArea(quad) {
+  	let total = 0;
+  	for (let index = 0; index < 4; index += 1) {
+  		const current = quad[index];
+  		const next = quad[(index + 1) % 4];
+  		total += current.x * next.y - next.x * current.y;
+  	}
+  	return total / 2;
+  }
+  function at(values, index) {
+  	return values[index] ?? 0;
   }
   //#endregion
   //#region src/optical-time/sampling.ts
@@ -600,6 +735,56 @@
   		}
   	}
   	return count === 0 ? 0 : total / count;
+  }
+  //#endregion
+  //#region src/optical-time/quad-sampling.ts
+  /** Points taken across each cell, per axis, when averaging it. */
+  var CELL_TAPS = 3;
+  /** Share of the cell left untouched at each edge. */
+  var CELL_INSET = .25;
+  /**
+  * Reads each cell through the panel's own coordinates.
+  *
+  * The taps are placed in pattern space and mapped into the image, so a cell is
+  * sampled from the part of the image that actually shows it whatever the camera
+  * angle or the projector's keystone. Mapping the other way -- carving the image
+  * into equal boxes -- is what makes an oblique view sample its neighbours.
+  */
+  function sampleCellsThroughQuad(frame, quad, profile) {
+  	const homography = homographyFromUnitSquare(quad);
+  	if (homography.length !== 9) return void 0;
+  	const values = [];
+  	for (let row = 0; row < profile.rows; row += 1) for (let column = 0; column < profile.columns; column += 1) {
+  		let total = 0;
+  		let count = 0;
+  		for (let tapY = 0; tapY < CELL_TAPS; tapY += 1) for (let tapX = 0; tapX < CELL_TAPS; tapX += 1) {
+  			const unit = cellTap(column, row, tapX, tapY, profile);
+  			const point = applyHomography(homography, unit.x, unit.y);
+  			if (!point) continue;
+  			const sample = pixelAt(frame, point);
+  			if (sample === void 0) continue;
+  			total += sample;
+  			count += 1;
+  		}
+  		if (count === 0) return void 0;
+  		values.push(total / count);
+  	}
+  	return values.length === cellCount(profile) ? values : void 0;
+  }
+  function cellTap(column, row, tapX, tapY, profile) {
+  	const span = 1 - CELL_INSET * 2;
+  	const offset = CELL_INSET + span * tapX / 2;
+  	const offsetY = CELL_INSET + span * tapY / 2;
+  	return {
+  		x: (column + offset) / profile.columns,
+  		y: (row + offsetY) / profile.rows
+  	};
+  }
+  function pixelAt(frame, point) {
+  	const x = Math.round(point.x);
+  	const y = Math.round(point.y);
+  	if (x < 0 || y < 0 || x >= frame.width || y >= frame.height) return void 0;
+  	return frame.data[y * frame.width + x];
   }
   //#endregion
   //#region src/optical-time/panel-detector.ts
@@ -685,7 +870,12 @@
   			ok: false,
   			reason: "wrong-shape"
   		};
-  		if (best.area / (width * height) < settings.minimumFillRatio) return {
+  		const quad = cornersOf(best.points);
+  		if (!quad) return {
+  			ok: false,
+  			reason: "wrong-shape"
+  		};
+  		if (best.area / Math.abs(quadArea(quad)) < settings.minimumFillRatio) return {
   			ok: false,
   			reason: "not-solid"
   		};
@@ -696,7 +886,8 @@
   				y: best.minY,
   				width,
   				height
-  			}
+  			},
+  			quad
   		};
   	}
   };
@@ -714,6 +905,7 @@
   		let minY = height;
   		let maxX = 0;
   		let maxY = 0;
+  		const extremes = [];
   		while (stack.length > 0) {
   			const index = stack.pop();
   			const x = index % width;
@@ -723,6 +915,10 @@
   			if (x > maxX) maxX = x;
   			if (y < minY) minY = y;
   			if (y > maxY) maxY = y;
+  			trackExtreme(extremes, {
+  				x,
+  				y
+  			});
   			if (x > 0) push(index - 1);
   			if (x + 1 < width) push(index + 1);
   			if (y > 0) push(index - width);
@@ -733,10 +929,23 @@
   			minY,
   			maxX,
   			maxY,
-  			area
+  			area,
+  			points: extremes
   		});
   	}
   	return regions.sort((left, right) => right.area - left.area);
+  	/** Keeps the running extremes of both diagonals, so corners survive. */
+  	function trackExtreme(extremes, point) {
+  		if (extremes.length < 4) {
+  			while (extremes.length < 4) extremes.push(point);
+  			return;
+  		}
+  		const [topLeft, topRight, bottomRight, bottomLeft] = extremes;
+  		if (point.x + point.y < topLeft.x + topLeft.y) extremes[0] = point;
+  		if (point.x - point.y > topRight.x - topRight.y) extremes[1] = point;
+  		if (point.x + point.y > bottomRight.x + bottomRight.y) extremes[2] = point;
+  		if (point.x - point.y < bottomLeft.x - bottomLeft.y) extremes[3] = point;
+  	}
   	function push(index) {
   		if (mask[index] === 1 && visited[index] === 0) {
   			visited[index] = 1;
@@ -768,6 +977,7 @@
   			...options
   		};
   		this.samples = Array.from({ length: cellCount(profile) }, () => []);
+  		this.fiducials = new Set(profile.fiducials);
   	}
   	/** Adds one reading to the learning window. */
   	add(values) {
@@ -783,14 +993,42 @@
   	sampleCount() {
   		return this.samples[0]?.length ?? 0;
   	}
-  	/** The narrowest band across the cells: the panel's weakest contrast. */
+  	/**
+  	* The narrowest band across the data cells: the panel's weakest contrast.
+  	*
+  	* Fiducials are excluded. They are lit in every code, so their band is zero
+  	* by construction, and counting them would report every panel carrying
+  	* fiducials as having no contrast at all.
+  	*/
   	contrast() {
   		let smallest = Number.POSITIVE_INFINITY;
-  		for (const level of this.resolve()) {
+  		this.resolve().forEach((level, index) => {
+  			if (this.fiducials.has(index)) return;
   			const span = level.high - level.low;
   			if (span < smallest) smallest = span;
-  		}
+  		});
   		return Number.isFinite(smallest) ? smallest : 0;
+  	}
+  	/**
+  	* One threshold for cells that never change, taken across the data cells.
+  	*
+  	* A fiducial has no band of its own to be read against, so it is read against
+  	* the panel as a whole. That still answers the question the fiducial exists
+  	* for: is this part of the image the lit corner of the panel, or something
+  	* else the decoder has wandered onto.
+  	*/
+  	globalThreshold() {
+  		const lows = [];
+  		const highs = [];
+  		this.resolve().forEach((level, index) => {
+  			if (this.fiducials.has(index)) return;
+  			lows.push(level.low);
+  			highs.push(level.high);
+  		});
+  		if (lows.length === 0) return 0;
+  		lows.sort((left, right) => left - right);
+  		highs.sort((left, right) => left - right);
+  		return (percentile(lows, .5) + percentile(highs, .5)) / 2;
   	}
   	/**
   	* How much room the weakest cell of a reading had to spare.
@@ -802,6 +1040,7 @@
   		const levels = this.resolve();
   		let smallest = Number.POSITIVE_INFINITY;
   		for (let index = 0; index < levels.length; index += 1) {
+  			if (this.fiducials.has(index)) continue;
   			const level = levels[index];
   			const value = values[index];
   			if (value === void 0 || !Number.isFinite(value)) return 0;
@@ -813,10 +1052,15 @@
   	}
   	decodeCells(values) {
   		const levels = this.resolve();
+  		const globalThreshold = this.fiducials.size > 0 ? this.globalThreshold() : 0;
   		const cells = [];
   		for (let index = 0; index < levels.length; index += 1) {
   			const level = levels[index];
   			const value = values[index];
+  			if (this.fiducials.has(index)) {
+  				cells.push(value === void 0 || !Number.isFinite(value) ? void 0 : value > globalThreshold);
+  				continue;
+  			}
   			const threshold = (level.low + level.high) / 2;
   			const margin = (level.high - level.low) * this.options.marginRatio;
   			if (value === void 0 || !Number.isFinite(value) || Math.abs(value - threshold) < margin) cells.push(void 0);
@@ -839,6 +1083,7 @@
   		if (this.decode(values) === void 0) return;
   		const cells = this.decodeCells(values);
   		for (let index = 0; index < levels.length; index += 1) {
+  			if (this.fiducials.has(index)) continue;
   			const level = levels[index];
   			const value = values[index];
   			const cell = cells[index];
@@ -1441,6 +1686,7 @@
   		this.lease = void 0;
   		this.levels = void 0;
   		this.rects = [];
+  		this.quad = void 0;
   		this.observations.length = 0;
   		this.recentDecodes.length = 0;
   		this.lastDecode = void 0;
@@ -1467,6 +1713,7 @@
   		this.message = "";
   		this.levels = void 0;
   		this.rects = [];
+  		this.quad = void 0;
   		this.observations.length = 0;
   		this.recentDecodes.length = 0;
   		this.lastDecode = void 0;
@@ -1482,6 +1729,7 @@
   				range: new PanelRangeAccumulator(this.analysisWidth, this.analysisHeight),
   				levels: new CellLevels(this.profile),
   				rects: [],
+  				quad: void 0,
   				attempts: 0,
   				decodes: 0,
   				settle: (error) => {
@@ -1527,7 +1775,11 @@
   		const levels = this.levels;
   		const start = this.start_;
   		if (!levels || !start) return;
-  		const samples = sampleCells(frame.luminance, this.rects);
+  		const samples = this.sample(frame.luminance);
+  		if (!samples) {
+  			this.recordDecodeAttempt(false);
+  			return;
+  		}
   		const code = levels.decode(samples);
   		this.lastDecodeMargin = levels.decodeMargin(samples);
   		this.recordDecodeAttempt(code !== void 0);
@@ -1652,10 +1904,12 @@
   				return;
   			}
   			calibration.rects = patternCellRects(detection.panel, this.profile);
+  			calibration.quad = detection.quad;
   			calibration.phase = "levels";
   			return;
   		}
-  		const samples = sampleCells(frame.luminance, calibration.rects);
+  		const samples = this.sampleWith(frame.luminance, calibration.rects, calibration.quad);
+  		if (!samples) return;
   		calibration.levels.add(samples);
   		calibration.attempts += 1;
   		if (calibration.levels.decode(samples) !== void 0) calibration.decodes += 1;
@@ -1673,6 +1927,7 @@
   		}
   		this.levels = calibration.levels;
   		this.rects = calibration.rects;
+  		this.quad = calibration.quad;
   		this.recentDecodes.length = 0;
   		this.pipelineState = "ready";
   		this.code = "";
@@ -1695,6 +1950,22 @@
   		const percent = Math.round(rate * 100);
   		if (this.exposureIsTooLong()) return `Only ${percent}% of frames decoded: the camera's exposure is longer than one display refresh, so most exposures span two codes.`;
   		return `Only ${percent}% of the frames decoded during calibration.`;
+  	}
+  	/**
+  	* Reads the cells the way the profile asks for.
+  	*
+  	* The grid path divides the panel's bounding box evenly, which the extraction
+  	* source did and which only holds for a square-on, undistorted view. The quad
+  	* path maps the panel's own corners, so a tilted camera or a keystoned
+  	* projection reads the cell it is aiming at rather than part of its
+  	* neighbour.
+  	*/
+  	sample(frame) {
+  		return this.sampleWith(frame, this.rects, this.quad);
+  	}
+  	sampleWith(frame, rects, quad) {
+  		if (this.profile.sampling === "quad") return quad ? sampleCellsThroughQuad(frame, quad, this.profile) : void 0;
+  		return sampleCells(frame, rects);
   	}
   	recordDecodeAttempt(decoded) {
   		this.recentDecodes.push(decoded);

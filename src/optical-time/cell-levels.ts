@@ -51,12 +51,14 @@ export class CellLevels {
   private readonly profile: PatternProfile;
   private readonly options: Required<CellLevelsOptions>;
   private readonly samples: number[][];
+  private readonly fiducials: ReadonlySet<number>;
   private levels: Level[] | undefined;
 
   public constructor(profile: PatternProfile, options: CellLevelsOptions = {}) {
     this.profile = profile;
     this.options = {...defaults, ...options};
     this.samples = Array.from({length: cellCount(profile)}, () => []);
+    this.fiducials = new Set(profile.fiducials);
   }
 
   /** Adds one reading to the learning window. */
@@ -75,14 +77,43 @@ export class CellLevels {
     return this.samples[0]?.length ?? 0;
   }
 
-  /** The narrowest band across the cells: the panel's weakest contrast. */
+  /**
+   * The narrowest band across the data cells: the panel's weakest contrast.
+   *
+   * Fiducials are excluded. They are lit in every code, so their band is zero
+   * by construction, and counting them would report every panel carrying
+   * fiducials as having no contrast at all.
+   */
   public contrast(): number {
     let smallest = Number.POSITIVE_INFINITY;
-    for (const level of this.resolve()) {
+    this.resolve().forEach((level, index) => {
+      if (this.fiducials.has(index)) return;
       const span = level.high - level.low;
       if (span < smallest) smallest = span;
-    }
+    });
     return Number.isFinite(smallest) ? smallest : 0;
+  }
+
+  /**
+   * One threshold for cells that never change, taken across the data cells.
+   *
+   * A fiducial has no band of its own to be read against, so it is read against
+   * the panel as a whole. That still answers the question the fiducial exists
+   * for: is this part of the image the lit corner of the panel, or something
+   * else the decoder has wandered onto.
+   */
+  private globalThreshold(): number {
+    const lows: number[] = [];
+    const highs: number[] = [];
+    this.resolve().forEach((level, index) => {
+      if (this.fiducials.has(index)) return;
+      lows.push(level.low);
+      highs.push(level.high);
+    });
+    if (lows.length === 0) return 0;
+    lows.sort((left, right) => left - right);
+    highs.sort((left, right) => left - right);
+    return (percentile(lows, 0.5) + percentile(highs, 0.5)) / 2;
   }
 
   /**
@@ -95,11 +126,13 @@ export class CellLevels {
     const levels = this.resolve();
     let smallest = Number.POSITIVE_INFINITY;
     for (let index = 0; index < levels.length; index += 1) {
+      if (this.fiducials.has(index)) continue;
       const level = levels[index] as Level;
       const value = values[index];
       if (value === undefined || !Number.isFinite(value)) return 0;
       const threshold = (level.low + level.high) / 2;
-      const margin = Math.abs(value - threshold) - ((level.high - level.low) * this.options.marginRatio);
+      const margin =
+        Math.abs(value - threshold) - (level.high - level.low) * this.options.marginRatio;
       if (margin < smallest) smallest = margin;
     }
     return Number.isFinite(smallest) ? smallest : 0;
@@ -107,10 +140,17 @@ export class CellLevels {
 
   public decodeCells(values: readonly number[]): (boolean | undefined)[] {
     const levels = this.resolve();
+    const globalThreshold = this.fiducials.size > 0 ? this.globalThreshold() : 0;
     const cells: (boolean | undefined)[] = [];
     for (let index = 0; index < levels.length; index += 1) {
       const level = levels[index] as Level;
       const value = values[index];
+      if (this.fiducials.has(index)) {
+        cells.push(
+          value === undefined || !Number.isFinite(value) ? undefined : value > globalThreshold
+        );
+        continue;
+      }
       const threshold = (level.low + level.high) / 2;
       const margin = (level.high - level.low) * this.options.marginRatio;
       if (value === undefined || !Number.isFinite(value) || Math.abs(value - threshold) < margin) {
@@ -139,6 +179,7 @@ export class CellLevels {
     if (code === undefined) return;
     const cells = this.decodeCells(values);
     for (let index = 0; index < levels.length; index += 1) {
+      if (this.fiducials.has(index)) continue;
       const level = levels[index] as Level;
       const value = values[index];
       const cell = cells[index];

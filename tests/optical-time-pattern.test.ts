@@ -145,7 +145,9 @@ describe('pattern profiles', () => {
     dataBits: 12,
     checkBits: 4,
     stepUs: 1000,
-    encoding: 'differential'
+    encoding: 'differential',
+    sampling: 'quad',
+    fiducials: []
   };
 
   it('keeps the lit cell count constant for a differential profile', () => {

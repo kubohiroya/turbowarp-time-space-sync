@@ -22,6 +22,8 @@ import {
   type PatternProfile
 } from './pattern-profile.js';
 import {patternCellRects, sampleCells, type PanelRect} from './sampling.js';
+import type {Quad} from './homography.js';
+import {sampleCellsThroughQuad} from './quad-sampling.js';
 
 export type OpticalTimeState =
   | 'idle'
@@ -96,6 +98,7 @@ interface Calibration {
   range: PanelRangeAccumulator;
   levels: CellLevels;
   rects: PanelRect[];
+  quad: Quad | undefined;
   attempts: number;
   decodes: number;
   settle: (error?: Error) => void;
@@ -128,6 +131,7 @@ export class OpticalTimeController {
   private pump: FramePumpPort | undefined;
   private levels: CellLevels | undefined;
   private rects: PanelRect[] = [];
+  private quad: Quad | undefined;
   private calibration: Calibration | undefined;
   private pipelineState: OpticalTimeState = 'idle';
   private code: TimeSpaceSyncErrorCode = '';
@@ -288,6 +292,7 @@ export class OpticalTimeController {
     this.lease = undefined;
     this.levels = undefined;
     this.rects = [];
+    this.quad = undefined;
     this.observations.length = 0;
     this.recentDecodes.length = 0;
     this.lastDecode = undefined;
@@ -334,6 +339,7 @@ export class OpticalTimeController {
     this.message = '';
     this.levels = undefined;
     this.rects = [];
+    this.quad = undefined;
     this.observations.length = 0;
     this.recentDecodes.length = 0;
     this.lastDecode = undefined;
@@ -352,6 +358,7 @@ export class OpticalTimeController {
         range: new PanelRangeAccumulator(this.analysisWidth, this.analysisHeight),
         levels: new CellLevels(this.profile),
         rects: [],
+        quad: undefined,
         attempts: 0,
         decodes: 0,
         settle: (error) => {
@@ -405,7 +412,11 @@ export class OpticalTimeController {
     const levels = this.levels;
     const start = this.start_;
     if (!levels || !start) return;
-    const samples = sampleCells(frame.luminance, this.rects);
+    const samples = this.sample(frame.luminance);
+    if (!samples) {
+      this.recordDecodeAttempt(false);
+      return;
+    }
     const code = levels.decode(samples);
     this.lastDecodeMargin = levels.decodeMargin(samples);
     this.recordDecodeAttempt(code !== undefined);
@@ -556,10 +567,12 @@ export class OpticalTimeController {
         return;
       }
       calibration.rects = patternCellRects(detection.panel, this.profile);
+      calibration.quad = detection.quad;
       calibration.phase = 'levels';
       return;
     }
-    const samples = sampleCells(frame.luminance, calibration.rects);
+    const samples = this.sampleWith(frame.luminance, calibration.rects, calibration.quad);
+    if (!samples) return;
     calibration.levels.add(samples);
     calibration.attempts += 1;
     if (calibration.levels.decode(samples) !== undefined) calibration.decodes += 1;
@@ -577,6 +590,7 @@ export class OpticalTimeController {
     }
     this.levels = calibration.levels;
     this.rects = calibration.rects;
+    this.quad = calibration.quad;
     this.recentDecodes.length = 0;
     this.pipelineState = 'ready';
     this.code = '';
@@ -605,6 +619,30 @@ export class OpticalTimeController {
       return `Only ${percent}% of frames decoded: the camera's exposure is longer than one display refresh, so most exposures span two codes.`;
     }
     return `Only ${percent}% of the frames decoded during calibration.`;
+  }
+
+  /**
+   * Reads the cells the way the profile asks for.
+   *
+   * The grid path divides the panel's bounding box evenly, which the extraction
+   * source did and which only holds for a square-on, undistorted view. The quad
+   * path maps the panel's own corners, so a tilted camera or a keystoned
+   * projection reads the cell it is aiming at rather than part of its
+   * neighbour.
+   */
+  private sample(frame: CapturedFrame['luminance']): number[] | undefined {
+    return this.sampleWith(frame, this.rects, this.quad);
+  }
+
+  private sampleWith(
+    frame: CapturedFrame['luminance'],
+    rects: readonly PanelRect[],
+    quad: Quad | undefined
+  ): number[] | undefined {
+    if (this.profile.sampling === 'quad') {
+      return quad ? sampleCellsThroughQuad(frame, quad, this.profile) : undefined;
+    }
+    return sampleCells(frame, rects);
   }
 
   private recordDecodeAttempt(decoded: boolean): void {
