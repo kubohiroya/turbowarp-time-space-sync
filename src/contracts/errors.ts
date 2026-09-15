@@ -89,3 +89,25 @@ export function toLegacyFrameSyncErrorCode(
 ): LegacyFrameSyncErrorCode {
   return LEGACY_BY_CODE[code];
 }
+
+/**
+ * A refusal carrying one of the codes above.
+ *
+ * Every path that gives up produces one of these rather than a bare `Error`,
+ * so a caller can branch on the reason without parsing a message, and so a
+ * block reporter has something stable to publish.
+ */
+export class TimeSpaceSyncError extends Error {
+  public readonly code: TimeSpaceSyncErrorCode;
+
+  public constructor(code: TimeSpaceSyncErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'TimeSpaceSyncError';
+    this.code = code;
+  }
+}
+
+/** The code of an error, or `invalid-payload` for anything not from this package. */
+export function errorCodeOf(error: unknown): TimeSpaceSyncErrorCode {
+  return error instanceof TimeSpaceSyncError ? error.code : 'invalid-payload';
+}
