@@ -32,6 +32,9 @@ export const TIME_SPACE_SYNC_ERROR_CODES = [
   'degenerate-view',
   'insufficient-points',
   'verification-failed',
+  // Display.
+  'photosensitivity-unacknowledged',
+  'display-unavailable',
   // Contract validation.
   'invalid-payload'
 ] as const;
@@ -80,6 +83,8 @@ const LEGACY_BY_CODE: Readonly<Record<TimeSpaceSyncErrorCode, LegacyFrameSyncErr
   'degenerate-view': 'camera-unavailable',
   'insufficient-points': 'camera-unavailable',
   'verification-failed': 'camera-unavailable',
+  'photosensitivity-unacknowledged': 'camera-unavailable',
+  'display-unavailable': 'camera-unavailable',
   'invalid-payload': 'camera-unavailable'
 };
 
