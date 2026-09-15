@@ -224,6 +224,54 @@
   			"text": "optical time minimum calibration seconds",
   			"description": "Returns the shortest calibration window in which every pattern cell is guaranteed to change state at least once.",
   			"arguments": {}
+  		},
+  		{
+  			"opcode": "estimateTimeCorrespondence",
+  			"feature": "opticalTimeSyncV1",
+  			"blockType": "COMMAND",
+  			"text": "estimate time correspondence",
+  			"description": "Intersects the observations collected so far into one delay. A reading bounds the delay rather than measuring it, so the result is the set of delays every reading allows; when a strict majority cannot agree on any, nothing is published.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "timeCorrespondenceJson",
+  			"feature": "opticalTimeSyncV1",
+  			"blockType": "REPORTER",
+  			"text": "time correspondence JSON",
+  			"description": "Returns the last estimate as twtss/time-correspondence version 1 JSON, or an empty string when none has been made.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "timeCorrespondenceError",
+  			"feature": "opticalTimeSyncV1",
+  			"blockType": "REPORTER",
+  			"text": "time correspondence error",
+  			"description": "Returns why the last estimate could not be made, or an empty string when it succeeded.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "displayToTimestampDelayUs",
+  			"feature": "opticalTimeSyncV1",
+  			"blockType": "REPORTER",
+  			"text": "display to timestamp delay us",
+  			"description": "Returns how much later a frame is stamped than the pattern it shows was drawn, in microseconds. This is not a clock offset: an optical reading constrains only the sum of the clock offset and the two pipeline delays, and the components folded in are listed in the JSON.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "timeCorrespondenceUncertaintyUs",
+  			"feature": "opticalTimeSyncV1",
+  			"blockType": "REPORTER",
+  			"text": "time correspondence uncertainty us",
+  			"description": "Returns half the width of the delays the readings agree on. It shrinks as readings accumulate and never reaches zero, because one refresh of the display is never resolved.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "timeCorrespondenceCurrent",
+  			"feature": "opticalTimeSyncV1",
+  			"blockType": "BOOLEAN",
+  			"text": "time correspondence current?",
+  			"description": "Reports whether the last estimate still describes the present. Every estimate expires: one measured before the camera refocused or the clock was re-estimated is not a smaller measurement but a measurement of something else.",
+  			"arguments": {}
   		}
   	]
   };
@@ -322,10 +370,17 @@
   finite({ minimum: 0 }), finite({ minimum: 0 }), finite({ exclusiveMinimum: 0 }), finite({ exclusiveMinimum: 0 });
   finite({ exclusiveMinimum: 0 }), integer({ minimum: 1 }), integer({ minimum: 1 });
   integer({ minimum: 1 }), integer({ minimum: 1 }), integer({ minimum: 1 }), finite({ minimum: 0 }), integer({ minimum: 1 }), integer({ minimum: 1 }), integer({ minimum: 0 });
+  //#endregion
+  //#region src/contracts/time-correspondence.ts
+  var TIME_CORRESPONDENCE_SCHEMA = "twtss/time-correspondence";
   integer({ minimum: 0 }), integer({ minimum: 0 }), integer({ minimum: 0 }), finite({
   	minimum: 0,
   	maximum: 1
   }), finite({ minimum: 0 }), finite(), finite({ minimum: 0 }), finite(), finite();
+  /** True when the result still describes the present, on the observer's clock. */
+  function isCurrent(result, nowUs) {
+  	return nowUs < result.validUntilUs;
+  }
   finite(), finite(), finite(), finite({ minimum: 0 });
   finite({ minimum: 0 }), finite({ minimum: 0 });
   finite({ minimum: 0 }), finite({ minimum: 0 }), integer({ minimum: 1 }), integer({ minimum: 1 }), finite({ exclusiveMinimum: 0 });
@@ -1064,7 +1119,7 @@
   		if (lows.length === 0) return 0;
   		lows.sort((left, right) => left - right);
   		highs.sort((left, right) => left - right);
-  		return (percentile(lows, .5) + percentile(highs, .5)) / 2;
+  		return (percentile$1(lows, .5) + percentile$1(highs, .5)) / 2;
   	}
   	/**
   	* How much room the weakest cell of a reading had to spare.
@@ -1147,8 +1202,8 @@
   			};
   			const sorted = [...bucket].sort((left, right) => left - right);
   			return {
-  				low: percentile(sorted, this.options.trimRatio),
-  				high: percentile(sorted, 1 - this.options.trimRatio)
+  				low: percentile$1(sorted, this.options.trimRatio),
+  				high: percentile$1(sorted, 1 - this.options.trimRatio)
   			};
   		});
   		return this.levels;
@@ -1158,7 +1213,7 @@
   	if (limit <= 0) return 0;
   	return Math.max(-limit, Math.min(limit, value));
   }
-  function percentile(sorted, fraction) {
+  function percentile$1(sorted, fraction) {
   	if (sorted.length === 0) return 0;
   	if (sorted.length === 1) return sorted[0];
   	const position = (sorted.length - 1) * Math.min(1, Math.max(0, fraction));
@@ -2052,6 +2107,224 @@
   	return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
   //#endregion
+  //#region src/optical-time/estimator.ts
+  var DEFAULT_VALIDITY_US = 3e7;
+  var DEFAULT_MINIMUM_AGREEMENT = .5;
+  /**
+  * Folds a delay onto the half wrap period nearest zero.
+  *
+  * The pattern only says the time within its wrap window, so a delay is known
+  * modulo that period. Folding to the nearest representative rather than to the
+  * first positive residue keeps a slightly negative delay slightly negative: an
+  * over-corrected capture time or a clock error would otherwise arrive as an
+  * outlier just short of a full wrap and wreck every summary computed from it.
+  *
+  * The transport applies the same rule to the samples it collects. The two are
+  * held together by a shared fixture rather than by shared code: the rule lives
+  * in a module that package does not publish.
+  */
+  function foldDelayUs(delayUs, wrapUs = 0) {
+  	if (!(wrapUs > 0)) return delayUs;
+  	const half = wrapUs / 2;
+  	return ((delayUs + half) % wrapUs + wrapUs) % wrapUs - half;
+  }
+  /**
+  * The delays one reading allows.
+  *
+  * The capture instant lies in `[constraintLo, constraintHi]` on the observer's
+  * clock. The code it shows was on screen from its own timestamp until one
+  * refresh later, give or take how well that refresh is known. The delay is the
+  * first minus the second, so the widest difference and the narrowest bound the
+  * interval.
+  */
+  function delayIntervalFor(observation) {
+  	const onsetLoUs = observation.patternCodeTimestampUs - observation.refreshUncertaintyUs;
+  	const onsetHiUs = observation.patternCodeTimestampUs + observation.displayRefreshUs + observation.refreshUncertaintyUs;
+  	const loUs = observation.constraintLoUs - onsetHiUs;
+  	const hiUs = observation.constraintHiUs - onsetLoUs;
+  	const centre = (loUs + hiUs) / 2;
+  	const shift = centre - foldDelayUs(centre, observation.wrapUs);
+  	return {
+  		loUs: loUs - shift,
+  		hiUs: hiUs - shift
+  	};
+  }
+  /**
+  * The region the most intervals agree on.
+  *
+  * Plain intersection is not usable here: one reading that slipped past the
+  * check bits empties it, and a result that disappears whenever a single frame
+  * misreads is no result at all. Sweeping the edges finds the region the largest
+  * number of readings cover, and reports how many that was, so a caller can see
+  * the disagreement rather than having it silently averaged away.
+  */
+  function agreeOn(intervals) {
+  	if (intervals.length === 0) return void 0;
+  	const edges = [];
+  	for (const interval of intervals) {
+  		if (interval.hiUs < interval.loUs) continue;
+  		edges.push({
+  			at: interval.loUs,
+  			delta: 1
+  		});
+  		edges.push({
+  			at: interval.hiUs,
+  			delta: -1
+  		});
+  	}
+  	if (edges.length === 0) return void 0;
+  	edges.sort((left, right) => left.at - right.at || right.delta - left.delta);
+  	let running = 0;
+  	let best = 0;
+  	let loUs = 0;
+  	let hiUs = 0;
+  	for (let index = 0; index < edges.length; index += 1) {
+  		const edge = edges[index];
+  		running += edge.delta;
+  		if (edge.delta === 1 && running > best) {
+  			best = running;
+  			loUs = edge.at;
+  			hiUs = edge.at;
+  			const next = edges[index + 1];
+  			if (next) hiUs = next.at;
+  		}
+  	}
+  	return best === 0 ? void 0 : {
+  		loUs,
+  		hiUs,
+  		agreed: best
+  	};
+  }
+  function estimateTimeCorrespondence(observations, options) {
+  	if (observations.length === 0) return {
+  		ok: false,
+  		code: "insufficient-points",
+  		message: "No observations have been collected for this camera."
+  	};
+  	const first = observations[0];
+  	const mismatch = firstMismatch(observations, first);
+  	if (mismatch) return mismatch;
+  	const intervals = observations.map((observation) => delayIntervalFor(observation));
+  	const agreement = agreeOn(intervals);
+  	if (!agreement) return {
+  		ok: false,
+  		code: "decode-unstable",
+  		message: "No reading produced a usable interval."
+  	};
+  	const ratio = agreement.agreed / observations.length;
+  	const minimum = options.minimumAgreementRatio ?? DEFAULT_MINIMUM_AGREEMENT;
+  	const outvoted = observations.length > 1 && agreement.agreed * 2 <= observations.length;
+  	if (ratio < minimum || outvoted) return {
+  		ok: false,
+  		code: "decode-unstable",
+  		message: `Only ${agreement.agreed} of ${observations.length} readings agree on any delay, so no interval describes them all.`
+  	};
+  	const midpoints = intervals.map((interval) => (interval.loUs + interval.hiUs) / 2);
+  	const validityUs = options.validityUs ?? DEFAULT_VALIDITY_US;
+  	const degraded = ratio < 1 || observations.length < 2;
+  	const notes = [];
+  	if (agreement.agreed < observations.length) notes.push(`${observations.length - agreement.agreed} of ${observations.length} readings lie outside the agreed interval.`);
+  	if (observations.length < 2) notes.push("A single reading bounds the delay but does not corroborate it.");
+  	return {
+  		ok: true,
+  		correspondence: {
+  			schema: TIME_CORRESPONDENCE_SCHEMA,
+  			version: 1,
+  			cameraId: first.cameraId,
+  			referenceId: first.referenceId,
+  			observerDomain: first.observerDomain,
+  			displayDomain: first.displayDomain,
+  			displayToTimestampDelayUs: Math.round((agreement.loUs + agreement.hiUs) / 2),
+  			delayLoUs: Math.round(agreement.loUs),
+  			delayHiUs: Math.round(agreement.hiUs),
+  			uncertaintyUs: Math.round((agreement.hiUs - agreement.loUs) / 2),
+  			sampleCount: observations.length,
+  			rejectedCount: options.rejectedCount ?? 0,
+  			droppedCount: options.droppedCount ?? 0,
+  			decodeRate: options.decodeRate ?? 0,
+  			decodeMarginMin: Math.min(...observations.map((entry) => entry.decodeMargin)),
+  			measuredAtUs: Math.round(options.nowUs),
+  			validUntilUs: Math.round(options.nowUs + validityUs),
+  			unidentifiedComponents: unidentifiedFor(first),
+  			degraded,
+  			notes,
+  			robust: summarize(midpoints)
+  		}
+  	};
+  }
+  /**
+  * What the result folds together and cannot separate.
+  *
+  * The camera's capture-to-timestamp delay and the display's draw-to-photons
+  * delay are always in there; optical readings constrain only their sum. The
+  * clock offset joins them whenever the two clocks are not the same one, which
+  * is the price of measuring across machines and the reason the same-computer
+  * case is worth keeping simple. Rolling shutter is listed because the panel
+  * occupies part of the frame and the rows carrying it are exposed at their own
+  * time, which nothing here models.
+  */
+  function unidentifiedFor(observation) {
+  	const components = [
+  		"cameraPipelineDelay",
+  		"displayPipelineDelay",
+  		"rollingShutterSkew"
+  	];
+  	const display = observation.displayDomain;
+  	if (display === null || !sameClockDomain(display, observation.observerDomain)) components.unshift("clockOffset");
+  	return components;
+  }
+  /** Refuses a set of readings that cannot be summarised as one measurement. */
+  function firstMismatch(observations, first) {
+  	for (const observation of observations) {
+  		if (observation.cameraId !== first.cameraId || observation.referenceId !== first.referenceId) return {
+  			ok: false,
+  			code: "invalid-payload",
+  			message: "The readings do not all come from one camera watching one reference."
+  		};
+  		if (observation.patternProfileId !== first.patternProfileId) return {
+  			ok: false,
+  			code: "invalid-payload",
+  			message: "The readings were decoded under different pattern profiles."
+  		};
+  		if (observation.observerDomain.id !== first.observerDomain.id) return {
+  			ok: false,
+  			code: "clock-domain-mismatch",
+  			message: "The readings were stamped on different clocks."
+  		};
+  		if (observation.observerDomain.epoch !== first.observerDomain.epoch) return {
+  			ok: false,
+  			code: "clock-epoch-changed",
+  			message: "The clock was re-estimated partway through, so the readings are not comparable."
+  		};
+  	}
+  }
+  function summarize(values) {
+  	const sorted = [...values].filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+  	if (sorted.length === 0) return {
+  		median: 0,
+  		mad: 0,
+  		p10: 0,
+  		p90: 0
+  	};
+  	const median = percentile(sorted, .5);
+  	const deviations = sorted.map((value) => Math.abs(value - median)).sort((a, b) => a - b);
+  	return {
+  		median: Math.round(median),
+  		mad: Math.round(percentile(deviations, .5)),
+  		p10: Math.round(percentile(sorted, .1)),
+  		p90: Math.round(percentile(sorted, .9))
+  	};
+  }
+  function percentile(sorted, fraction) {
+  	if (sorted.length === 0) return 0;
+  	if (sorted.length === 1) return sorted[0];
+  	const position = (sorted.length - 1) * Math.min(1, Math.max(0, fraction));
+  	const lower = Math.floor(position);
+  	const upper = Math.ceil(position);
+  	const low = sorted[lower];
+  	return low + ((sorted[upper] ?? low) - low) * (position - lower);
+  }
+  //#endregion
   //#region src/runtime-capability.ts
   var runtimeCapabilityKey = "kubohiroyaTimeSpaceSyncCapability";
   function createRuntimeCapability(host) {
@@ -2082,6 +2355,7 @@
   var ANALYSIS_HEIGHT = 180;
   var TimeSpaceSyncExtension = class {
   	constructor(options = {}) {
+  		this.correspondenceError = "";
   		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
   		this.opticalTimeEnabled = options.opticalTimeEnabled ?? featureFlags.opticalTimeSyncV1;
   		this.placementEnabled = options.placementEnabled ?? featureFlags.placementSolveV1;
@@ -2178,6 +2452,39 @@
   	latestOpticalTimeObservationJson() {
   		return this.observation ? JSON.stringify(this.observation) : "";
   	}
+  	estimateTimeCorrespondence() {
+  		this.requireOpticalTime();
+  		const controller = this.requireController();
+  		const result = estimateTimeCorrespondence(controller.drainObservations(), {
+  			nowUs: this.clock.nowUs(),
+  			decodeRate: controller.decodeRate(),
+  			droppedCount: controller.droppedCount(),
+  			rejectedCount: controller.rejectedCount()
+  		});
+  		if (result.ok) {
+  			this.correspondence = result.correspondence;
+  			this.correspondenceError = "";
+  			return;
+  		}
+  		this.correspondence = void 0;
+  		this.correspondenceError = result.code;
+  	}
+  	timeCorrespondenceJson() {
+  		return this.correspondence ? JSON.stringify(this.correspondence) : "";
+  	}
+  	timeCorrespondenceError() {
+  		return this.correspondenceError;
+  	}
+  	displayToTimestampDelayUs() {
+  		return this.correspondence?.displayToTimestampDelayUs ?? 0;
+  	}
+  	timeCorrespondenceUncertaintyUs() {
+  		return this.correspondence?.uncertaintyUs ?? 0;
+  	}
+  	timeCorrespondenceCurrent() {
+  		const correspondence = this.correspondence;
+  		return correspondence !== void 0 && isCurrent(correspondence, this.clock.nowUs());
+  	}
   	opticalTimeMinimumCalibrationSeconds() {
   		return this.requireController().minimumCalibrationSeconds();
   	}
@@ -2259,6 +2566,8 @@
   			this.controller?.stop().catch(() => void 0);
   			this.display?.hide();
   			this.observation = void 0;
+  			this.correspondence = void 0;
+  			this.correspondenceError = "";
   			this.acknowledgement = void 0;
   		};
   		for (const event of [

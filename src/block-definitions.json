@@ -198,6 +198,54 @@
       "text": "optical time minimum calibration seconds",
       "description": "Returns the shortest calibration window in which every pattern cell is guaranteed to change state at least once.",
       "arguments": {}
+    },
+    {
+      "opcode": "estimateTimeCorrespondence",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "COMMAND",
+      "text": "estimate time correspondence",
+      "description": "Intersects the observations collected so far into one delay. A reading bounds the delay rather than measuring it, so the result is the set of delays every reading allows; when a strict majority cannot agree on any, nothing is published.",
+      "arguments": {}
+    },
+    {
+      "opcode": "timeCorrespondenceJson",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "time correspondence JSON",
+      "description": "Returns the last estimate as twtss/time-correspondence version 1 JSON, or an empty string when none has been made.",
+      "arguments": {}
+    },
+    {
+      "opcode": "timeCorrespondenceError",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "time correspondence error",
+      "description": "Returns why the last estimate could not be made, or an empty string when it succeeded.",
+      "arguments": {}
+    },
+    {
+      "opcode": "displayToTimestampDelayUs",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "display to timestamp delay us",
+      "description": "Returns how much later a frame is stamped than the pattern it shows was drawn, in microseconds. This is not a clock offset: an optical reading constrains only the sum of the clock offset and the two pipeline delays, and the components folded in are listed in the JSON.",
+      "arguments": {}
+    },
+    {
+      "opcode": "timeCorrespondenceUncertaintyUs",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "time correspondence uncertainty us",
+      "description": "Returns half the width of the delays the readings agree on. It shrinks as readings accumulate and never reaches zero, because one refresh of the display is never resolved.",
+      "arguments": {}
+    },
+    {
+      "opcode": "timeCorrespondenceCurrent",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "BOOLEAN",
+      "text": "time correspondence current?",
+      "description": "Reports whether the last estimate still describes the present. Every estimate expires: one measured before the camera refocused or the clock was re-estimated is not a smaller measurement but a measurement of something else.",
+      "arguments": {}
     }
   ]
 }

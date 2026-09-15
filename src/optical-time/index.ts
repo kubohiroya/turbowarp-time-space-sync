@@ -8,3 +8,4 @@ export * from './cell-levels.js';
 export * from './pattern-display.js';
 export * from './frame-pump.js';
 export * from './controller.js';
+export * from './estimator.js';

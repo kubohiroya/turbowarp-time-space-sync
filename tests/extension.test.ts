@@ -144,3 +144,25 @@ describe('project lifetime', () => {
     expect(events).toEqual(['PROJECT_STOP_ALL', 'PROJECT_LOADED', 'RUNTIME_DISPOSED']);
   });
 });
+
+describe('estimation through the blocks', () => {
+  it('reports no estimate and no error before one is attempted', () => {
+    const extension = new TimeSpaceSyncExtension({runtime: runtime()});
+    expect(extension.timeCorrespondenceJson()).toBe('');
+    expect(extension.timeCorrespondenceError()).toBe('');
+    expect(extension.timeCorrespondenceCurrent()).toBe(false);
+  });
+
+  it('records why an estimate could not be made', () => {
+    const extension = new TimeSpaceSyncExtension({
+      runtime: runtime(),
+      opticalTimeEnabled: true
+    });
+    extension.estimateTimeCorrespondence();
+    expect(extension.timeCorrespondenceError()).toBe('insufficient-points');
+    expect(extension.timeCorrespondenceJson()).toBe('');
+    // Not zero because the delay is zero: zero because there is no answer. The
+    // error reporter is what tells the two apart.
+    expect(extension.displayToTimestampDelayUs()).toBe(0);
+  });
+});
