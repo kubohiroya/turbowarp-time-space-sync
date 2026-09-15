@@ -95,26 +95,62 @@ export function invertHomography(homography: Homography): number[] {
 }
 
 /**
- * The four extreme corners of a set of points, in unit-square order.
+ * The four corners of a region, in unit-square order.
  *
- * Picked by the two diagonal sums rather than by a bounding box, so a panel the
- * camera sees rotated keeps its own corners instead of acquiring the corners of
- * the box around it.
+ * Two candidate quadrilaterals are built and the larger one wins. The diagonal
+ * extremes find the corners of a panel the camera sees square on; the axis
+ * extremes find them when it sees the panel turned about 45 degrees. Each is
+ * degenerate exactly where the other is sharp: along an edge of a
+ * 45-degree-rotated square, `x + y` is constant, so the diagonal extremes pick
+ * an arbitrary point on that edge and can collapse two corners onto one. Taking
+ * whichever quadrilateral encloses more area avoids a detector that works at
+ * every angle except the middle of its range.
+ *
+ * Which corner is treated as the pattern's own origin still follows from the
+ * image, so a panel rotated by a whole quarter turn is read with its cells
+ * transposed. Recovering that needs a pattern whose corners are not all alike.
  */
 export function cornersOf(points: readonly Point[]): Quad | undefined {
   if (points.length < 4) return undefined;
-  let topLeft = points[0] as Point;
-  let topRight = points[0] as Point;
-  let bottomRight = points[0] as Point;
-  let bottomLeft = points[0] as Point;
+  const diagonal = extremesBy(
+    points,
+    (point) => point.x + point.y,
+    (point) => point.x - point.y
+  );
+  const axis = extremesBy(
+    points,
+    (point) => point.y,
+    (point) => point.x
+  );
+  const candidates = [diagonal, axis]
+    .map((quad) => ({quad, area: quadArea(quad)}))
+    .filter((entry) => entry.area > 0)
+    .sort((left, right) => right.area - left.area);
+  return candidates[0]?.quad;
+}
+
+/**
+ * The extremes of two functionals, ordered so the quadrilateral does not cross.
+ *
+ * `first` runs from the start corner to the opposite one; `second` separates
+ * the two remaining corners.
+ */
+function extremesBy(
+  points: readonly Point[],
+  first: (point: Point) => number,
+  second: (point: Point) => number
+): Quad {
+  let start = points[0] as Point;
+  let end = points[0] as Point;
+  let low = points[0] as Point;
+  let high = points[0] as Point;
   for (const point of points) {
-    if (point.x + point.y < topLeft.x + topLeft.y) topLeft = point;
-    if (point.x - point.y > topRight.x - topRight.y) topRight = point;
-    if (point.x + point.y > bottomRight.x + bottomRight.y) bottomRight = point;
-    if (point.x - point.y < bottomLeft.x - bottomLeft.y) bottomLeft = point;
+    if (first(point) < first(start)) start = point;
+    if (first(point) > first(end)) end = point;
+    if (second(point) > second(high)) high = point;
+    if (second(point) < second(low)) low = point;
   }
-  const quad: Quad = [topLeft, topRight, bottomRight, bottomLeft];
-  return quadArea(quad) > 0 ? quad : undefined;
+  return [start, high, end, low];
 }
 
 /** Twice the signed area; positive for corners in the expected order. */

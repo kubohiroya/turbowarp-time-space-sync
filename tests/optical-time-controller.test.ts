@@ -363,7 +363,8 @@ describe('failures inside the frame callback', () => {
       sourceWidth: 8,
       sourceHeight: 8
     });
-    await expect(started).rejects.toThrow(/Frame size/);
+    await expect(started).rejects.toThrow(/frame but the decoder is analysing/);
+    expect(harness.controller.errorCode()).toBe('frame-size-mismatch');
     expect(harness.controller.state()).toBe('error');
   });
 });

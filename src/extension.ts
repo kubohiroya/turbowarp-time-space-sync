@@ -145,9 +145,7 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
       referenceId: Scratch.Cast.toString(args.REFERENCE_ID),
       calibrationSeconds: Scratch.Cast.toNumber(args.SECONDS),
       displayRefreshUs: Math.round(Scratch.Cast.toNumber(args.REFRESH_US)),
-      // Not measured from here. The decoder is told what the display reported,
-      // and how well it knows it; the display publishes both.
-      refreshUncertaintyUs: 0
+      refreshUncertaintyUs: this.refreshUncertaintyUs()
     });
   }
 
@@ -206,6 +204,21 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
   }
 
   // Wiring ----------------------------------------------------------------
+
+  /**
+   * How well the display's refresh interval is known.
+   *
+   * When the pattern is being shown from this machine the display has measured
+   * the spread of its own frames and that figure is used. When it is not -- the
+   * display is on another computer and the interval arrived as a block argument
+   * -- nothing here measured anything, and the honest floor is one pattern
+   * step: the displayed value is quantised to that, so the moment a code
+   * appeared cannot be stated more precisely however well the refresh is known.
+   * Reporting zero would claim an exactness no part of this run established.
+   */
+  private refreshUncertaintyUs(): number {
+    return this.display?.refreshUncertaintyUs() ?? this.profile.stepUs;
+  }
 
   private featureEnabled(feature: FeatureName): boolean {
     return feature === 'placementSolveV1' ? this.placementEnabled : this.opticalTimeEnabled;

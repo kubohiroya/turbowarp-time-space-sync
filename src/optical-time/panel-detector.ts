@@ -1,3 +1,4 @@
+import {TimeSpaceSyncError} from '../contracts/index.js';
 import {cornersOf, quadArea, type Point, type Quad} from './homography.js';
 import type {LuminanceFrame, PanelRect} from './sampling.js';
 import type {PatternProfile} from './pattern-profile.js';
@@ -9,8 +10,18 @@ export interface PanelDetectionOptions {
   readonly rangeRatio?: number;
   /** Smallest analysis pixels per pattern cell. */
   readonly minimumCellPixels?: number;
-  /** Smallest share of the bounding box the detected region must fill. */
+  /** Smallest share of the region's own corner quadrilateral it must fill. */
   readonly minimumFillRatio?: number;
+  /**
+   * Smallest share of the axis-aligned bounding box the region must fill.
+   *
+   * Looser than the quadrilateral bound, because a rotated panel genuinely does
+   * not fill its box: a square turned 45 degrees fills half of it. It is still
+   * needed, because a long thin band fills its own quadrilateral completely
+   * while filling almost none of its box, and the quadrilateral bound alone
+   * would accept it.
+   */
+  readonly minimumBoxFillRatio?: number;
   /** Largest tolerated width-to-height ratio of the bounding box. */
   readonly maximumAspectSkew?: number;
   /**
@@ -25,6 +36,7 @@ const defaultOptions: Required<PanelDetectionOptions> = {
   rangeRatio: 0.5,
   minimumCellPixels: 3,
   minimumFillRatio: 0.5,
+  minimumBoxFillRatio: 0.35,
   maximumAspectSkew: 2.5,
   ambiguityRatio: 0.5
 };
@@ -71,7 +83,10 @@ export class PanelRangeAccumulator {
 
   public add(frame: LuminanceFrame): void {
     if (frame.width !== this.width || frame.height !== this.height) {
-      throw new Error('Frame size does not match the accumulator.');
+      throw new TimeSpaceSyncError(
+        'frame-size-mismatch',
+        `The camera delivered a ${frame.width}x${frame.height} frame but the decoder is analysing ${this.width}x${this.height}.`
+      );
     }
     for (let index = 0; index < frame.data.length; index += 1) {
       const value = frame.data[index] ?? 0;
@@ -134,12 +149,32 @@ export class PanelRangeAccumulator {
     // against the corners the panel actually has rather than the box around it.
     const quad = cornersOf(best.points);
     if (!quad) return {ok: false, reason: 'wrong-shape'};
-    if (best.area / Math.abs(quadArea(quad)) < settings.minimumFillRatio) {
+    if (
+      best.area / Math.abs(quadArea(quad)) < settings.minimumFillRatio ||
+      best.area / (width * height) < settings.minimumBoxFillRatio
+    ) {
       return {ok: false, reason: 'not-solid'};
     }
     return {ok: true, panel: {x: best.minX, y: best.minY, width, height}, quad};
   }
 }
+
+/**
+ * The functionals whose maxima are candidate corners.
+ *
+ * Maxima only; a minimum is the maximum of the negated measure, which keeps the
+ * running update to a single comparison per measure.
+ */
+const EXTREME_MEASURES: ReadonlyArray<(point: Point) => number> = [
+  (point) => -(point.x + point.y),
+  (point) => point.x - point.y,
+  (point) => point.x + point.y,
+  (point) => point.y - point.x,
+  (point) => -point.y,
+  (point) => point.x,
+  (point) => point.y,
+  (point) => -point.x
+];
 
 interface Region {
   minX: number;
@@ -147,7 +182,13 @@ interface Region {
   maxX: number;
   maxY: number;
   area: number;
-  /** Extreme points along both diagonals, enough to recover the corners. */
+  /**
+   * Extreme points along both diagonals and both axes.
+   *
+   * Both sets are kept because each is degenerate where the other is sharp: the
+   * diagonal extremes pin the corners of a panel seen square on, the axis
+   * extremes pin them when it is turned about 45 degrees.
+   */
   points: Point[];
 }
 
@@ -185,22 +226,16 @@ function findRegions(mask: Uint8Array, width: number, height: number): Region[] 
   }
   return regions.sort((left, right) => right.area - left.area);
 
-  /** Keeps the running extremes of both diagonals, so corners survive. */
+  /** Keeps the running extremes of both diagonals and both axes. */
   function trackExtreme(extremes: Point[], point: Point): void {
-    if (extremes.length < 4) {
-      while (extremes.length < 4) extremes.push(point);
+    if (extremes.length < EXTREME_MEASURES.length) {
+      while (extremes.length < EXTREME_MEASURES.length) extremes.push(point);
       return;
     }
-    const [topLeft, topRight, bottomRight, bottomLeft] = extremes as [
-      Point,
-      Point,
-      Point,
-      Point
-    ];
-    if (point.x + point.y < topLeft.x + topLeft.y) extremes[0] = point;
-    if (point.x - point.y > topRight.x - topRight.y) extremes[1] = point;
-    if (point.x + point.y > bottomRight.x + bottomRight.y) extremes[2] = point;
-    if (point.x - point.y < bottomLeft.x - bottomLeft.y) extremes[3] = point;
+    EXTREME_MEASURES.forEach((measure, index) => {
+      const current = extremes[index] as Point;
+      if (measure(point) > measure(current)) extremes[index] = point;
+    });
   }
 
   function push(index: number): void {
