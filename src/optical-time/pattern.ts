@@ -2,6 +2,7 @@ import {
   cellCount,
   cellsPerBit,
   codeCount,
+  dataCellCount,
   requireUsableProfile,
   wrapUs,
   type PatternProfile
@@ -61,16 +62,16 @@ export function encodePatternCells(code: number, profile: PatternProfile): boole
   for (let index = 0; index < profile.checkBits; index += 1) {
     bits.push(bitAt(check, profile.checkBits - 1 - index));
   }
-  const cells: boolean[] = [];
+  const payload: boolean[] = [];
   for (const bit of bits) {
-    cells.push(bit);
+    payload.push(bit);
     // The paired cell always holds the opposite state, so every code lights
-    // exactly half the cells and the panel's total output does not change from
-    // one code to the next.
-    if (profile.encoding === 'differential') cells.push(!bit);
+    // exactly half the data cells and the panel's total output does not change
+    // from one code to the next.
+    if (profile.encoding === 'differential') payload.push(!bit);
   }
-  while (cells.length < cellCount(profile)) cells.push(false);
-  return cells;
+  while (payload.length < dataCellCount(profile)) payload.push(false);
+  return layOut(payload, profile);
 }
 
 /**
@@ -87,10 +88,18 @@ export function decodePatternCells(
 ): number | undefined {
   requireUsableProfile(profile);
   if (cells.length !== cellCount(profile)) return undefined;
+  const fiducials = new Set(profile.fiducials);
+  // A fiducial is lit in every code, so one that does not come back lit means
+  // the cells were read from the wrong region and the data cells are not the
+  // cells they are assumed to be.
+  for (const index of fiducials) {
+    if (cells[index] !== true) return undefined;
+  }
+  const payload = cells.filter((_, index) => !fiducials.has(index));
   const stride = cellsPerBit(profile);
   const bits: boolean[] = [];
   for (let index = 0; index < profile.dataBits + profile.checkBits; index += 1) {
-    const bit = readBit(cells, index * stride, profile);
+    const bit = readBit(payload, index * stride, profile);
     if (bit === undefined) return undefined;
     bits.push(bit);
   }
@@ -124,6 +133,22 @@ function readBit(
   // Both cells reading the same way is not a bit at all: the pair was misread,
   // or the panel moved between them.
   return cell === opposite ? undefined : cell;
+}
+
+/** Places the payload cells around the fiducials, in row-major order. */
+function layOut(payload: readonly boolean[], profile: PatternProfile): boolean[] {
+  const fiducials = new Set(profile.fiducials);
+  const cells: boolean[] = [];
+  let next = 0;
+  for (let index = 0; index < cellCount(profile); index += 1) {
+    if (fiducials.has(index)) {
+      cells.push(true);
+      continue;
+    }
+    cells.push(payload[next] === true);
+    next += 1;
+  }
+  return cells;
 }
 
 function normalizeCode(code: number, profile: PatternProfile): number {
