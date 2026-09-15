@@ -1,3 +1,4 @@
+import {cornersOf, quadArea, type Point, type Quad} from './homography.js';
 import type {LuminanceFrame, PanelRect} from './sampling.js';
 import type {PatternProfile} from './pattern-profile.js';
 
@@ -44,7 +45,7 @@ export type PanelDetectionFailure =
   | 'ambiguous';
 
 export type PanelDetection =
-  | {readonly ok: true; readonly panel: PanelRect}
+  | {readonly ok: true; readonly panel: PanelRect; readonly quad: Quad}
   | {readonly ok: false; readonly reason: PanelDetectionFailure};
 
 /**
@@ -129,10 +130,14 @@ export class PanelRangeAccumulator {
     if (skew > settings.maximumAspectSkew || skew < 1 / settings.maximumAspectSkew) {
       return {ok: false, reason: 'wrong-shape'};
     }
-    if (best.area / (width * height) < settings.minimumFillRatio) {
+    // A rotated panel does not fill its bounding box, so the fill check is made
+    // against the corners the panel actually has rather than the box around it.
+    const quad = cornersOf(best.points);
+    if (!quad) return {ok: false, reason: 'wrong-shape'};
+    if (best.area / Math.abs(quadArea(quad)) < settings.minimumFillRatio) {
       return {ok: false, reason: 'not-solid'};
     }
-    return {ok: true, panel: {x: best.minX, y: best.minY, width, height}};
+    return {ok: true, panel: {x: best.minX, y: best.minY, width, height}, quad};
   }
 }
 
@@ -142,6 +147,8 @@ interface Region {
   maxX: number;
   maxY: number;
   area: number;
+  /** Extreme points along both diagonals, enough to recover the corners. */
+  points: Point[];
 }
 
 /** Connected regions of the mask, largest first. */
@@ -158,6 +165,7 @@ function findRegions(mask: Uint8Array, width: number, height: number): Region[] 
     let minY = height;
     let maxX = 0;
     let maxY = 0;
+    const extremes: Point[] = [];
     while (stack.length > 0) {
       const index = stack.pop() as number;
       const x = index % width;
@@ -167,14 +175,33 @@ function findRegions(mask: Uint8Array, width: number, height: number): Region[] 
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
+      trackExtreme(extremes, {x, y});
       if (x > 0) push(index - 1);
       if (x + 1 < width) push(index + 1);
       if (y > 0) push(index - width);
       if (y + 1 < height) push(index + width);
     }
-    regions.push({minX, minY, maxX, maxY, area});
+    regions.push({minX, minY, maxX, maxY, area, points: extremes});
   }
   return regions.sort((left, right) => right.area - left.area);
+
+  /** Keeps the running extremes of both diagonals, so corners survive. */
+  function trackExtreme(extremes: Point[], point: Point): void {
+    if (extremes.length < 4) {
+      while (extremes.length < 4) extremes.push(point);
+      return;
+    }
+    const [topLeft, topRight, bottomRight, bottomLeft] = extremes as [
+      Point,
+      Point,
+      Point,
+      Point
+    ];
+    if (point.x + point.y < topLeft.x + topLeft.y) extremes[0] = point;
+    if (point.x - point.y > topRight.x - topRight.y) extremes[1] = point;
+    if (point.x + point.y > bottomRight.x + bottomRight.y) extremes[2] = point;
+    if (point.x - point.y < bottomLeft.x - bottomLeft.y) extremes[3] = point;
+  }
 
   function push(index: number): void {
     if (mask[index] === 1 && visited[index] === 0) {

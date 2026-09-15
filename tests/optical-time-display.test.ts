@@ -291,7 +291,9 @@ describe('drawing', () => {
       dataBits: 12,
       checkBits: 4,
       stepUs: 1000,
-      encoding: 'differential'
+      encoding: 'differential',
+      sampling: 'quad',
+      fiducials: []
     };
     expect(decodePatternCells(blankCells(differential), differential)).toBeUndefined();
   });
