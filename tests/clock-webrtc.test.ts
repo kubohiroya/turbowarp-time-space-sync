@@ -71,16 +71,39 @@ describe('WebRTC peer clock', () => {
   });
 
   it('treats an estimate that came back after a gap as a new one', () => {
+    // The epoch has to move at the gap, not when the next estimate arrives: by
+    // then the old offset is gone and an estimate that came back different
+    // would keep the old epoch, letting a timestamp from before the gap be
+    // converted with the new offset.
     const state: FakeState = {synced: true, offsetUs: 2500, uncertaintyUs: 450, localUs: 1000};
     const bridge = peerClock(state);
     expect(bridge.estimate()?.domain.epoch).toBe(0);
     state.synced = false;
     expect(bridge.estimate()).toBeUndefined();
     state.synced = true;
+    expect(bridge.estimate()?.domain.epoch).toBe(1);
+  });
+
+  it('advances the epoch even when the peer comes back with the same offset', () => {
+    const state: FakeState = {synced: true, offsetUs: 2500, uncertaintyUs: 450, localUs: 1000};
+    const bridge = peerClock(state);
+    bridge.estimate();
+    state.synced = false;
+    bridge.estimate();
+    state.synced = true;
+    state.offsetUs = 9000;
+    const estimate = bridge.estimate();
+    expect(estimate?.domain.epoch).toBe(1);
+    expect(estimate?.offsetUs).toBe(9000);
+  });
+
+  it('does not advance the epoch while the peer was never synced', () => {
+    const state: FakeState = {synced: false, offsetUs: 0, uncertaintyUs: 0, localUs: 1000};
+    const bridge = peerClock(state);
+    bridge.estimate();
+    bridge.estimate();
+    state.synced = true;
     state.offsetUs = 2500;
-    // The same offset after a reconnection is a fresh measurement of the same
-    // number, so the epoch does not need to move; what matters is that the gap
-    // did not leave a stale estimate behind.
     expect(bridge.estimate()?.domain.epoch).toBe(0);
   });
 

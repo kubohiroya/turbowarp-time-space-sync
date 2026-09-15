@@ -654,31 +654,51 @@
   	};
   }
   /**
-  * The four extreme corners of a set of points, in unit-square order.
+  * The four corners of a region, in unit-square order.
   *
-  * Picked by the two diagonal sums rather than by a bounding box, so a panel the
-  * camera sees rotated keeps its own corners instead of acquiring the corners of
-  * the box around it.
+  * Two candidate quadrilaterals are built and the larger one wins. The diagonal
+  * extremes find the corners of a panel the camera sees square on; the axis
+  * extremes find them when it sees the panel turned about 45 degrees. Each is
+  * degenerate exactly where the other is sharp: along an edge of a
+  * 45-degree-rotated square, `x + y` is constant, so the diagonal extremes pick
+  * an arbitrary point on that edge and can collapse two corners onto one. Taking
+  * whichever quadrilateral encloses more area avoids a detector that works at
+  * every angle except the middle of its range.
+  *
+  * Which corner is treated as the pattern's own origin still follows from the
+  * image, so a panel rotated by a whole quarter turn is read with its cells
+  * transposed. Recovering that needs a pattern whose corners are not all alike.
   */
   function cornersOf(points) {
   	if (points.length < 4) return void 0;
-  	let topLeft = points[0];
-  	let topRight = points[0];
-  	let bottomRight = points[0];
-  	let bottomLeft = points[0];
+  	return [extremesBy(points, (point) => point.x + point.y, (point) => point.x - point.y), extremesBy(points, (point) => point.y, (point) => point.x)].map((quad) => ({
+  		quad,
+  		area: quadArea(quad)
+  	})).filter((entry) => entry.area > 0).sort((left, right) => right.area - left.area)[0]?.quad;
+  }
+  /**
+  * The extremes of two functionals, ordered so the quadrilateral does not cross.
+  *
+  * `first` runs from the start corner to the opposite one; `second` separates
+  * the two remaining corners.
+  */
+  function extremesBy(points, first, second) {
+  	let start = points[0];
+  	let end = points[0];
+  	let low = points[0];
+  	let high = points[0];
   	for (const point of points) {
-  		if (point.x + point.y < topLeft.x + topLeft.y) topLeft = point;
-  		if (point.x - point.y > topRight.x - topRight.y) topRight = point;
-  		if (point.x + point.y > bottomRight.x + bottomRight.y) bottomRight = point;
-  		if (point.x - point.y < bottomLeft.x - bottomLeft.y) bottomLeft = point;
+  		if (first(point) < first(start)) start = point;
+  		if (first(point) > first(end)) end = point;
+  		if (second(point) > second(high)) high = point;
+  		if (second(point) < second(low)) low = point;
   	}
-  	const quad = [
-  		topLeft,
-  		topRight,
-  		bottomRight,
-  		bottomLeft
+  	return [
+  		start,
+  		high,
+  		end,
+  		low
   	];
-  	return quadArea(quad) > 0 ? quad : void 0;
   }
   /** Twice the signed area; positive for corners in the expected order. */
   function quadArea(quad) {
@@ -793,6 +813,7 @@
   	rangeRatio: .5,
   	minimumCellPixels: 3,
   	minimumFillRatio: .5,
+  	minimumBoxFillRatio: .35,
   	maximumAspectSkew: 2.5,
   	ambiguityRatio: .5
   };
@@ -812,7 +833,7 @@
   		this.maximum = new Uint8Array(width * height);
   	}
   	add(frame) {
-  		if (frame.width !== this.width || frame.height !== this.height) throw new Error("Frame size does not match the accumulator.");
+  		if (frame.width !== this.width || frame.height !== this.height) throw new TimeSpaceSyncError("frame-size-mismatch", `The camera delivered a ${frame.width}x${frame.height} frame but the decoder is analysing ${this.width}x${this.height}.`);
   		for (let index = 0; index < frame.data.length; index += 1) {
   			const value = frame.data[index] ?? 0;
   			if (value < (this.minimum[index] ?? 255)) this.minimum[index] = value;
@@ -875,7 +896,7 @@
   			ok: false,
   			reason: "wrong-shape"
   		};
-  		if (best.area / Math.abs(quadArea(quad)) < settings.minimumFillRatio) return {
+  		if (best.area / Math.abs(quadArea(quad)) < settings.minimumFillRatio || best.area / (width * height) < settings.minimumBoxFillRatio) return {
   			ok: false,
   			reason: "not-solid"
   		};
@@ -891,6 +912,22 @@
   		};
   	}
   };
+  /**
+  * The functionals whose maxima are candidate corners.
+  *
+  * Maxima only; a minimum is the maximum of the negated measure, which keeps the
+  * running update to a single comparison per measure.
+  */
+  var EXTREME_MEASURES = [
+  	(point) => -(point.x + point.y),
+  	(point) => point.x - point.y,
+  	(point) => point.x + point.y,
+  	(point) => point.y - point.x,
+  	(point) => -point.y,
+  	(point) => point.x,
+  	(point) => point.y,
+  	(point) => -point.x
+  ];
   /** Connected regions of the mask, largest first. */
   function findRegions(mask, width, height) {
   	const visited = new Uint8Array(mask.length);
@@ -934,17 +971,16 @@
   		});
   	}
   	return regions.sort((left, right) => right.area - left.area);
-  	/** Keeps the running extremes of both diagonals, so corners survive. */
+  	/** Keeps the running extremes of both diagonals and both axes. */
   	function trackExtreme(extremes, point) {
-  		if (extremes.length < 4) {
-  			while (extremes.length < 4) extremes.push(point);
+  		if (extremes.length < EXTREME_MEASURES.length) {
+  			while (extremes.length < EXTREME_MEASURES.length) extremes.push(point);
   			return;
   		}
-  		const [topLeft, topRight, bottomRight, bottomLeft] = extremes;
-  		if (point.x + point.y < topLeft.x + topLeft.y) extremes[0] = point;
-  		if (point.x - point.y > topRight.x - topRight.y) extremes[1] = point;
-  		if (point.x + point.y > bottomRight.x + bottomRight.y) extremes[2] = point;
-  		if (point.x - point.y < bottomLeft.x - bottomLeft.y) extremes[3] = point;
+  		EXTREME_MEASURES.forEach((measure, index) => {
+  			const current = extremes[index];
+  			if (measure(point) > measure(current)) extremes[index] = point;
+  		});
   	}
   	function push(index) {
   		if (mask[index] === 1 && visited[index] === 0) {
@@ -1221,6 +1257,22 @@
   	}
   	refreshUs() {
   		return this.stable() ? this.medianInterval() : void 0;
+  	}
+  	/**
+  	* How well the refresh interval is known, as a half-width in microseconds.
+  	*
+  	* Taken from the spread of the samples themselves rather than assumed. A
+  	* display that schedules evenly reports a small figure; one being throttled
+  	* reports a large one, and a consumer sizing a constraint from it widens
+  	* instead of quietly producing a tighter answer than the measurement
+  	* supports.
+  	*/
+  	refreshUncertaintyUs() {
+  		if (!this.stable()) return void 0;
+  		const sorted = [...this.intervals].sort((left, right) => left - right);
+  		const low = sorted[Math.floor(sorted.length * .25)] ?? 0;
+  		const high = sorted[Math.floor(sorted.length * .75)] ?? 0;
+  		return Math.max(1, Math.round((high - low) / 2));
   	}
   	/** The code currently on screen, or undefined while the panel is blank. */
   	shownCode() {
@@ -2085,7 +2137,7 @@
   			referenceId: Scratch.Cast.toString(args.REFERENCE_ID),
   			calibrationSeconds: Scratch.Cast.toNumber(args.SECONDS),
   			displayRefreshUs: Math.round(Scratch.Cast.toNumber(args.REFRESH_US)),
-  			refreshUncertaintyUs: 0
+  			refreshUncertaintyUs: this.refreshUncertaintyUs()
   		});
   	}
   	async calibrateOpticalTimeDecoder(args) {
@@ -2128,6 +2180,20 @@
   	}
   	opticalTimeMinimumCalibrationSeconds() {
   		return this.requireController().minimumCalibrationSeconds();
+  	}
+  	/**
+  	* How well the display's refresh interval is known.
+  	*
+  	* When the pattern is being shown from this machine the display has measured
+  	* the spread of its own frames and that figure is used. When it is not -- the
+  	* display is on another computer and the interval arrived as a block argument
+  	* -- nothing here measured anything, and the honest floor is one pattern
+  	* step: the displayed value is quantised to that, so the moment a code
+  	* appeared cannot be stated more precisely however well the refresh is known.
+  	* Reporting zero would claim an exactness no part of this run established.
+  	*/
+  	refreshUncertaintyUs() {
+  		return this.display?.refreshUncertaintyUs() ?? this.profile.stepUs;
   	}
   	featureEnabled(feature) {
   		return feature === "placementSolveV1" ? this.placementEnabled : this.opticalTimeEnabled;

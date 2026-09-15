@@ -169,6 +169,23 @@ export class PatternDisplay {
     return this.stable() ? this.medianInterval() : undefined;
   }
 
+  /**
+   * How well the refresh interval is known, as a half-width in microseconds.
+   *
+   * Taken from the spread of the samples themselves rather than assumed. A
+   * display that schedules evenly reports a small figure; one being throttled
+   * reports a large one, and a consumer sizing a constraint from it widens
+   * instead of quietly producing a tighter answer than the measurement
+   * supports.
+   */
+  public refreshUncertaintyUs(): number | undefined {
+    if (!this.stable()) return undefined;
+    const sorted = [...this.intervals].sort((left, right) => left - right);
+    const low = sorted[Math.floor(sorted.length * 0.25)] ?? 0;
+    const high = sorted[Math.floor(sorted.length * 0.75)] ?? 0;
+    return Math.max(1, Math.round((high - low) / 2));
+  }
+
   /** The code currently on screen, or undefined while the panel is blank. */
   public shownCode(): number | undefined {
     return this.lastShownCode;
