@@ -2,11 +2,29 @@
 
 [日本語](README.ja.md)
 
-Initial TurboWarp extension scaffold for time-space-sync. This repository is based on `turbowarp-extension-template` v0.4.0. The proposed runtime algorithms are not implemented yet.
+Optical time correspondence and camera placement calibration for TurboWarp. This repository is based on `turbowarp-extension-template` v0.4.0.
 
 ## What it does
 
-Currently provides only the template's `hello [NAME]` smoke-test block, a Vite bundle, an API manifest, tests and CI. It does not perform synchronization, tracking, or reconstruction.
+Shows a time coded pattern on screen and decodes it back out of a camera, so a recorded frame can be placed against the moment the pattern was drawn. Placement against a measured physical reference is not implemented yet.
+
+Everything is behind startup-fixed feature flags in `config/feature-flags.ts`, **off by default**: an extension loaded without them publishes no blocks. Set them before the project starts:
+
+```js
+globalThis.__TWTSS_FEATURE_FLAGS__ = {opticalTimeSyncV1: true};
+```
+
+### What a measurement does and does not say
+
+An optical reading constrains the sum of three unknowns: the offset between the two clocks, the camera's capture-to-timestamp delay, and the display's draw-to-photons delay. It cannot separate them. Results are therefore reported as `displayToTimestampDelayUs` with the folded-in components listed, never as a clock offset, and a time correction never implies that two cameras were exposed at the same instant.
+
+A pattern code stays on screen for one display refresh, so the effective resolution is the refresh interval; the one millisecond step is only the quantisation of the displayed value. A reading also only decodes when the whole camera exposure falls inside one displayed code, which makes the decode rate roughly `1 - exposure / refresh`. A low rate usually means the exposure is too long rather than the panel too dim, and the decoder says which.
+
+If the camera's frame interval is a whole multiple of four pattern steps, the two lowest cells never change state, calibration learns no contrast for them and fails. Choose a calibration window whose frame interval is not such a multiple.
+
+### Photosensitivity
+
+The pattern covers a large area and reverses many cells every refresh. Showing it requires an explicit acknowledgement from the operator, the default panel covers 35% of the shorter screen edge, and Escape removes it at any time. The guidance this is measured against depends on the viewer's distance from the screen, which nothing here knows, so these are mitigations and not a claim of compliance.
 
 ## Planned implementation
 
@@ -69,7 +87,7 @@ Arrows indicate provider → consumer. This is a proposal; these integrations ar
 
 ## Requirements and safety
 
-Node.js >=22.18.0 and pnpm 11.11.0. The current sample runs sandboxed. Future camera/WebGPU integration requires an explicitly implemented unsandboxed runtime and capability checks. Published packages and hosted documentation are not available as part of this scaffold.
+Node.js >=22.18.0 and pnpm 11.11.0. The extension runs unsandboxed because it leases a camera through `turbowarp-camera-source` and draws a full screen overlay. It has no runtime dependencies and does not bundle OpenCV. Published packages and hosted documentation are not available yet.
 
 ## Development
 
@@ -92,15 +110,208 @@ Bundle: `dist/time-space-sync.js`. Contract: `dist/extension-manifest.json`.
 
 <!-- BEGIN GENERATED BLOCKS -->
 
-### `hello [NAME]`
+### `acknowledge that the time pattern flashes`
 
-Returns a localized greeting for the supplied name.
+Records that the operator was warned the full screen pattern flashes. The pattern will not be shown until this runs, and the acknowledgement lasts until the project stops.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `acknowledgePatternFlashing` |
+
+### `show time pattern`
+
+Covers the screen with the time coded pattern. The panel stays blank until the display refresh interval has been measured, so nothing decodable is shown from a guess.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `showTimePattern` |
+
+### `hide time pattern`
+
+Removes the time pattern overlay. Escape also removes it, and so does the page ceasing to be shown.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `hideTimePattern` |
+
+### `time pattern shown?`
+
+Reports whether the time pattern overlay is on screen.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `timePatternShown` |
+
+### `time pattern stable?`
+
+Reports whether the display refresh interval has been measured. While false the panel is blank and no camera can read a time from it.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `timePatternStable` |
+
+### `time pattern refresh us`
+
+Returns the measured display refresh interval in microseconds, or 0 before it has been measured.
 
 | Property | Value |
 |---|---|
 | Type | Reporter |
-| Opcode | `hello` |
-| `NAME` | String, default: `world` |
+| Opcode | `timePatternRefreshUs` |
+
+### `time pattern wrap us`
+
+Returns the period after which the encoded display time repeats, in microseconds.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `timePatternWrapUs` |
+
+### `time pattern profile id`
+
+Returns the identifier of the pattern profile in use. The decoder must be given the same profile or no reading will ever decode.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `timePatternProfileId` |
+
+### `start optical time decoder for camera [CAMERA_ID] reference [REFERENCE_ID] calibrating [SECONDS] seconds at [REFRESH_US] us refresh`
+
+Leases the camera, locates the pattern, learns each cell light and dark level, and refuses when readings do not decode often enough. The display refresh interval must be supplied because it sets how long each code stays on screen.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `startOpticalTimeDecoder` |
+| `CAMERA_ID` | String, default: `default` |
+| `REFERENCE_ID` | String, default: `screen` |
+| `SECONDS` | Number, default: `8` |
+| `REFRESH_US` | Number, default: `16667` |
+
+### `calibrate optical time decoder for [SECONDS] seconds`
+
+Runs calibration again on a running decoder, for example after the camera or the display moved.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `calibrateOpticalTimeDecoder` |
+| `SECONDS` | Number, default: `8` |
+
+### `stop optical time decoder`
+
+Stops decoding and releases the camera lease.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `stopOpticalTimeDecoder` |
+
+### `optical time decoder state`
+
+Returns idle, acquiring-camera, calibrating, ready, or error.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `opticalTimeDecoderState` |
+
+### `optical time decoder error`
+
+Returns the last decoder error code, or an empty string when there is none.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `opticalTimeDecoderError` |
+
+### `optical time decode rate`
+
+Returns the share of recent camera frames the decoder could read, between 0 and 1. It is governed by the camera exposure: a reading only decodes when the whole exposure falls inside one displayed code.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `opticalTimeDecodeRate` |
+
+### `optical time decode margin`
+
+Returns how much room the weakest cell of the last reading had to spare, in luminance units. A panel drifting out of readability shows here as a falling margin before it starts failing.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `opticalTimeDecodeMargin` |
+
+### `optical time observation available?`
+
+Reports whether a decoded observation is waiting to be taken.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `opticalTimeObservationAvailable` |
+
+### `optical time observation count`
+
+Returns how many observations are currently held. Observations are kept for a fixed stretch of time rather than a fixed count, so the window does not change length with the decode rate.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `opticalTimeObservationCount` |
+
+### `optical time dropped count`
+
+Returns how many observations were discarded for leaving the retention window or exceeding the memory cap.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `opticalTimeDroppedCount` |
+
+### `optical time rejected count`
+
+Returns how many readings decoded but could not follow the previous one in real time. A frozen panel and a reading that slipped past the check bits both land here.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `opticalTimeRejectedCount` |
+
+### `take next optical time observation`
+
+Removes the oldest observation from the queue and exposes it to the observation reporter.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `takeOpticalTimeObservation` |
+
+### `latest optical time observation JSON`
+
+Returns the taken observation as twtss/optical-time-observation version 1 JSON, or an empty string before one is taken.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `latestOpticalTimeObservationJson` |
+
+### `optical time minimum calibration seconds`
+
+Returns the shortest calibration window in which every pattern cell is guaranteed to change state at least once.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `opticalTimeMinimumCalibrationSeconds` |
 
 <!-- END GENERATED BLOCKS -->
 

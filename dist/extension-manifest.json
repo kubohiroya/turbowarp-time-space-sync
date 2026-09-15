@@ -3,14 +3,136 @@
   "id": "kubohiroyatimespacesync",
   "blocks": [
     {
-      "opcode": "hello",
-      "blockType": "REPORTER",
+      "opcode": "acknowledgePatternFlashing",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "calibrateOpticalTimeDecoder",
+      "blockType": "COMMAND",
       "arguments": [
         {
-          "id": "NAME",
-          "type": "STRING"
+          "id": "SECONDS",
+          "type": "NUMBER"
         }
       ]
+    },
+    {
+      "opcode": "hideTimePattern",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "latestOpticalTimeObservationJson",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "opticalTimeDecodeMargin",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "opticalTimeDecodeRate",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "opticalTimeDecoderError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "opticalTimeDecoderState",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "opticalTimeDroppedCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "opticalTimeMinimumCalibrationSeconds",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "opticalTimeObservationAvailable",
+      "blockType": "BOOLEAN",
+      "arguments": []
+    },
+    {
+      "opcode": "opticalTimeObservationCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "opticalTimeRejectedCount",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "showTimePattern",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "startOpticalTimeDecoder",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "CAMERA_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "REFERENCE_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "REFRESH_US",
+          "type": "NUMBER"
+        },
+        {
+          "id": "SECONDS",
+          "type": "NUMBER"
+        }
+      ]
+    },
+    {
+      "opcode": "stopOpticalTimeDecoder",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "takeOpticalTimeObservation",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "timePatternProfileId",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "timePatternRefreshUs",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "timePatternShown",
+      "blockType": "BOOLEAN",
+      "arguments": []
+    },
+    {
+      "opcode": "timePatternStable",
+      "blockType": "BOOLEAN",
+      "arguments": []
+    },
+    {
+      "opcode": "timePatternWrapUs",
+      "blockType": "REPORTER",
+      "arguments": []
     }
   ],
   "menus": []
