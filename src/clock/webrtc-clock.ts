@@ -49,9 +49,16 @@ export function createWebRtcPeerClock(
     peer: trimmed,
     estimate(): PeerClockEstimate | undefined {
       if (!hasEstimate(api, trimmed)) {
-        // Forget what we knew: a peer whose estimate has gone is a peer whose
-        // next estimate is a new measurement, not a continuation of the old one.
-        last = undefined;
+        // A peer whose estimate has gone is a peer whose next estimate is a new
+        // measurement, not a continuation of the old one. The epoch moves here
+        // rather than when the next estimate arrives: at that point the old
+        // offset is no longer around to be compared against, so an estimate
+        // that came back different would otherwise keep the old epoch and let a
+        // timestamp from before the gap be converted with the new offset.
+        if (last !== undefined) {
+          last = undefined;
+          epoch += 1;
+        }
         return undefined;
       }
       const offsetUs = asFinite(api.clockOffset({PEER: trimmed}));

@@ -255,3 +255,44 @@ describe('detection returns the panel corners', () => {
     }
   });
 });
+
+describe('finding corners at any angle', () => {
+  function diamondPoints(centre: number, radius: number): Point[] {
+    const points: Point[] = [];
+    for (let y = centre - radius; y <= centre + radius; y += 1) {
+      for (let x = centre - radius; x <= centre + radius; x += 1) {
+        if (Math.abs(x - centre) + Math.abs(y - centre) <= radius) points.push({x, y});
+      }
+    }
+    return points;
+  }
+
+  it('finds the corners of a square turned 45 degrees', () => {
+    // Along each edge of a 45-degree square, x + y is constant, so the diagonal
+    // extremes pick an arbitrary point on that edge and can collapse two
+    // corners onto one. The axis extremes are exact here, which is why both
+    // sets are kept.
+    const quad = cornersOf(diamondPoints(60, 40)) as Quad;
+    expect(quad).toBeDefined();
+    expect(Math.abs(quadArea(quad))).toBeCloseTo(2 * 40 * 40, -2);
+  });
+
+  it('finds the corners of an axis-aligned rectangle', () => {
+    const points: Point[] = [];
+    for (let y = 10; y <= 50; y += 1) {
+      for (let x = 20; x <= 100; x += 1) points.push({x, y});
+    }
+    const quad = cornersOf(points) as Quad;
+    expect(quadArea(quad)).toBeCloseTo(80 * 40, -2);
+  });
+
+  it('reads a panel the camera sees turned 45 degrees', () => {
+    const turned: Quad = [
+      {x: 100, y: 20},
+      {x: 170, y: 90},
+      {x: 100, y: 160},
+      {x: 30, y: 90}
+    ];
+    expect(readBack(1234, turned)).toBe(1234);
+  });
+});

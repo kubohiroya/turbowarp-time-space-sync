@@ -147,7 +147,7 @@ describe('panel detection refusals', () => {
   it('rejects a frame of the wrong size', () => {
     const accumulator = new PanelRangeAccumulator(WIDTH, HEIGHT);
     expect(() => accumulator.add({width: 8, height: 8, data: new Uint8Array(64)})).toThrowError(
-      /Frame size/
+      /frame but the decoder is analysing/
     );
   });
 });
@@ -224,5 +224,48 @@ describe('cell levels', () => {
       }
     }
     for (const level of levels.snapshot()) expect(level.high).toBeGreaterThan(level.low);
+  });
+});
+
+describe('solidity', () => {
+  it('refuses a long thin band that fills its own corners but not its box', () => {
+    // A strip light or a reflection running diagonally. Its corner
+    // quadrilateral is filled completely, so the quadrilateral bound alone
+    // accepts it; the bounding box it occupies is almost empty.
+    const size = 120;
+    const accumulator = new PanelRangeAccumulator(size, size);
+    for (let step = 0; step < 8; step += 1) {
+      const data = new Uint8Array(size * size).fill(background);
+      const on = step % 2 === 0;
+      for (let index = 10; index < 110; index += 1) {
+        for (let thickness = 0; thickness < 6; thickness += 1) {
+          data[index * size + index + thickness] = on ? 240 : 10;
+        }
+      }
+      accumulator.add({width: size, height: size, data});
+    }
+    const detection = accumulator.detect(v1);
+    expect(detection.ok).toBe(false);
+    if (!detection.ok) expect(detection.reason).toBe('not-solid');
+  });
+
+  it('still accepts a panel the camera sees rotated', () => {
+    const size = 120;
+    const accumulator = new PanelRangeAccumulator(size, size);
+    for (let step = 0; step < 8; step += 1) {
+      const data = new Uint8Array(size * size).fill(background);
+      const on = step % 2 === 0;
+      // A square turned 45 degrees fills half its bounding box.
+      for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+          if (Math.abs(x - 60) + Math.abs(y - 60) <= 40) {
+            data[y * size + x] = on ? 240 : 10;
+          }
+        }
+      }
+      accumulator.add({width: size, height: size, data});
+    }
+    const detection = accumulator.detect(v1);
+    expect(detection.ok ? 'ok' : detection.reason).toBe('ok');
   });
 });
