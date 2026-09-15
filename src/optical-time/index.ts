@@ -4,3 +4,5 @@ export * from './sampling.js';
 export * from './panel-detector.js';
 export * from './cell-levels.js';
 export * from './pattern-display.js';
+export * from './frame-pump.js';
+export * from './controller.js';
