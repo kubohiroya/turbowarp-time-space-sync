@@ -23,6 +23,17 @@ import {
   type PhotosensitivityAcknowledgement
 } from './optical-time/index.js';
 import {
+  solvePlacement,
+  type CameraModelFor
+} from './placement/index.js';
+import {
+  parsePlacementObservation,
+  parseReferenceDefinition,
+  type PlacementObservation,
+  type PlacementResult,
+  type ReferenceDefinition
+} from './contracts/index.js';
+import {
   createRuntimeCapability,
   runtimeCapabilityKey,
   type TimeSpaceSyncCapabilityV1
@@ -72,6 +83,11 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
   private observation: OpticalTimeObservation | undefined;
   private correspondence: TimeCorrespondence | undefined;
   private correspondenceError = '';
+  private reference: ReferenceDefinition | undefined;
+  private readonly placementObservations: PlacementObservation[] = [];
+  private readonly cameraModels = new Map<string, CameraModelFor>();
+  private placement: PlacementResult | undefined;
+  private placementErrorCode = '';
 
   public constructor(options: TimeSpaceSyncExtensionOptions = {}) {
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? ({} as TurboWarpRuntime);
@@ -256,6 +272,112 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
     return this.requireController().minimumCalibrationSeconds();
   }
 
+  // Placement -------------------------------------------------------------
+
+  public defineReference(args: {REFERENCE_JSON: unknown}): void {
+    this.requirePlacement();
+    const parsed = parseReferenceDefinition(readJson(args.REFERENCE_JSON));
+    if (!parsed.ok) {
+      this.placementErrorCode = 'invalid-payload';
+      return;
+    }
+    this.reference = parsed.value;
+    this.placementErrorCode = '';
+  }
+
+  public addPlacementObservation(args: {OBSERVATION_JSON: unknown}): void {
+    this.requirePlacement();
+    const parsed = parsePlacementObservation(readJson(args.OBSERVATION_JSON));
+    if (!parsed.ok) {
+      this.placementErrorCode = 'invalid-payload';
+      return;
+    }
+    // One observation per camera: a second look replaces the first rather than
+    // being averaged with it, since the camera may have moved between them.
+    const index = this.placementObservations.findIndex(
+      (entry) => entry.cameraId === parsed.value.cameraId
+    );
+    if (index >= 0) this.placementObservations.splice(index, 1);
+    this.placementObservations.push(parsed.value);
+    this.placementErrorCode = '';
+  }
+
+  public setCameraModel(args: {CAMERA_ID: unknown; MODEL_JSON: unknown}): void {
+    this.requirePlacement();
+    const cameraId = Scratch.Cast.toString(args.CAMERA_ID).trim();
+    const model = readJson(args.MODEL_JSON) as CameraModelFor | undefined;
+    if (!cameraId || !model || typeof model.intrinsics !== 'object') {
+      this.placementErrorCode = 'invalid-payload';
+      return;
+    }
+    this.cameraModels.set(cameraId, model);
+    this.placementErrorCode = '';
+  }
+
+  public solvePlacement(args: {RIG_ID: unknown}): void {
+    this.requirePlacement();
+    const reference = this.reference;
+    if (!reference) {
+      this.placementErrorCode = 'reference-unknown';
+      return;
+    }
+    let result;
+    try {
+      result = solvePlacement({
+        reference,
+        observations: this.placementObservations,
+        models: Object.fromEntries(this.cameraModels),
+        rigId: Scratch.Cast.toString(args.RIG_ID)
+      });
+    } catch (error) {
+      this.placement = undefined;
+      this.placementErrorCode = errorCodeOf(error);
+      return;
+    }
+    if (result.ok) {
+      this.placement = result.result;
+      this.placementErrorCode = '';
+      return;
+    }
+    // The previous placement is dropped: it described a different set of
+    // observations, and a reader asking now is asking about these.
+    this.placement = undefined;
+    this.placementErrorCode = result.code;
+  }
+
+  public placementResultJson(): string {
+    return this.placement ? JSON.stringify(this.placement) : '';
+  }
+
+  public placementError(): string {
+    return this.placementErrorCode;
+  }
+
+  public placementReprojectionRms(args: {CAMERA_ID: unknown}): number {
+    const cameraId = Scratch.Cast.toString(args.CAMERA_ID);
+    return (
+      this.placement?.cameras.find((camera) => camera.cameraId === cameraId)
+        ?.reprojectionRmsPx ?? 0
+    );
+  }
+
+  public clearPlacement(): void {
+    this.reference = undefined;
+    this.placementObservations.length = 0;
+    this.cameraModels.clear();
+    this.placement = undefined;
+    this.placementErrorCode = '';
+  }
+
+  private requirePlacement(): void {
+    if (!this.placementEnabled) {
+      throw new TimeSpaceSyncError(
+        'invalid-payload',
+        'Placement solve v1 is disabled. Enable it before the project starts.'
+      );
+    }
+  }
+
   // Wiring ----------------------------------------------------------------
 
   /**
@@ -359,6 +481,7 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
       this.observation = undefined;
       this.correspondence = undefined;
       this.correspondenceError = '';
+      this.clearPlacement();
       this.acknowledgement = undefined;
     };
     for (const event of ['PROJECT_STOP_ALL', 'PROJECT_LOADED', 'RUNTIME_DISPOSED']) {
@@ -381,6 +504,15 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
         ])
       )
     };
+  }
+}
+
+/** Parses block text as JSON, treating anything unparseable as absent. */
+function readJson(value: unknown): unknown {
+  try {
+    return JSON.parse(Scratch.Cast.toString(value));
+  } catch {
+    return undefined;
   }
 }
 

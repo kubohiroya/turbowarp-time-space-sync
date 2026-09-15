@@ -8,12 +8,37 @@
       "arguments": []
     },
     {
+      "opcode": "addPlacementObservation",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "OBSERVATION_JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
       "opcode": "calibrateOpticalTimeDecoder",
       "blockType": "COMMAND",
       "arguments": [
         {
           "id": "SECONDS",
           "type": "NUMBER"
+        }
+      ]
+    },
+    {
+      "opcode": "clearPlacement",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "defineReference",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "REFERENCE_JSON",
+          "type": "STRING"
         }
       ]
     },
@@ -83,9 +108,53 @@
       "arguments": []
     },
     {
+      "opcode": "placementError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "placementReprojectionRms",
+      "blockType": "REPORTER",
+      "arguments": [
+        {
+          "id": "CAMERA_ID",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "placementResultJson",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "setCameraModel",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "CAMERA_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "MODEL_JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
       "opcode": "showTimePattern",
       "blockType": "COMMAND",
       "arguments": []
+    },
+    {
+      "opcode": "solvePlacement",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "RIG_ID",
+          "type": "STRING"
+        }
+      ]
     },
     {
       "opcode": "startOpticalTimeDecoder",
