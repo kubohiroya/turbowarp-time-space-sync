@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kubohiroya/turbowarp-time-space-sync/main/schemas/time-correspondence-v1.schema.json",
+  "title": "Time correspondence, version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "cameraId",
+    "referenceId",
+    "observerDomain",
+    "displayDomain",
+    "displayToTimestampDelayUs",
+    "delayLoUs",
+    "delayHiUs",
+    "uncertaintyUs",
+    "sampleCount",
+    "rejectedCount",
+    "droppedCount",
+    "decodeRate",
+    "decodeMarginMin",
+    "measuredAtUs",
+    "validUntilUs",
+    "unidentifiedComponents",
+    "degraded",
+    "notes",
+    "robust"
+  ],
+  "properties": {
+    "schema": {
+      "const": "twtss/time-correspondence"
+    },
+    "version": {
+      "const": 1
+    },
+    "cameraId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "referenceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "observerDomain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "epoch",
+        "uncertaintyUs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "local-monotonic",
+            "webrtc-synchronized"
+          ]
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncertaintyUs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "displayDomain": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "epoch",
+            "uncertaintyUs"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "local-monotonic",
+                "webrtc-synchronized"
+              ]
+            },
+            "epoch": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "uncertaintyUs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "displayToTimestampDelayUs": {
+      "type": "integer"
+    },
+    "delayLoUs": {
+      "type": "integer"
+    },
+    "delayHiUs": {
+      "type": "integer"
+    },
+    "uncertaintyUs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sampleCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "rejectedCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "droppedCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "decodeRate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "decodeMarginMin": {
+      "type": "number",
+      "minimum": 0
+    },
+    "measuredAtUs": {
+      "type": "integer"
+    },
+    "validUntilUs": {
+      "type": "integer"
+    },
+    "unidentifiedComponents": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "clockOffset",
+          "cameraPipelineDelay",
+          "displayPipelineDelay",
+          "rollingShutterSkew"
+        ]
+      },
+      "maxItems": 4
+    },
+    "degraded": {
+      "type": "boolean"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 1024
+      },
+      "maxItems": 32
+    },
+    "robust": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "median",
+        "mad",
+        "p10",
+        "p90"
+      ],
+      "properties": {
+        "median": {
+          "type": "number"
+        },
+        "mad": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p10": {
+          "type": "number"
+        },
+        "p90": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

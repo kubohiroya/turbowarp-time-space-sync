@@ -1,0 +1,33 @@
+{
+  "schema": "twtss/time-correspondence",
+  "version": 1,
+  "cameraId": "camera-left",
+  "referenceId": "wall-projection",
+  "observerDomain": {
+    "id": "webrtc:studio-host",
+    "kind": "webrtc-synchronized",
+    "epoch": 3,
+    "uncertaintyUs": 450
+  },
+  "displayDomain": {
+    "id": "local:9f1c5a2e",
+    "kind": "local-monotonic",
+    "epoch": 0,
+    "uncertaintyUs": 0
+  },
+  "displayToTimestampDelayUs": 24180,
+  "delayLoUs": 15900,
+  "delayHiUs": 32460,
+  "uncertaintyUs": 8280,
+  "sampleCount": 214,
+  "rejectedCount": 11,
+  "droppedCount": 0,
+  "decodeRate": 0.63,
+  "decodeMarginMin": 18.25,
+  "measuredAtUs": 1737000000000000,
+  "validUntilUs": 1737000030000000,
+  "unidentifiedComponents": ["clockOffset", "cameraPipelineDelay", "displayPipelineDelay"],
+  "degraded": false,
+  "notes": ["Measured with the projector at 60 Hz."],
+  "robust": {"median": 24310, "mad": 3120, "p10": 17400, "p90": 31200}
+}

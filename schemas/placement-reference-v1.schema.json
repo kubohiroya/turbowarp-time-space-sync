@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kubohiroya/turbowarp-time-space-sync/main/schemas/placement-reference-v1.schema.json",
+  "title": "Placement reference, version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "referenceId",
+    "kind",
+    "points",
+    "planarityResidualMeters",
+    "rectangularityResidualMeters",
+    "measuredBy",
+    "notes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "twtss/placement-reference"
+    },
+    "version": {
+      "const": 1
+    },
+    "referenceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "screen",
+        "projection",
+        "board",
+        "custom"
+      ]
+    },
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "x",
+          "y",
+          "z",
+          "sigmaMeters"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          },
+          "z": {
+            "type": "number"
+          },
+          "sigmaMeters": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "minItems": 4,
+      "maxItems": 1024
+    },
+    "planarityResidualMeters": {
+      "type": "number",
+      "minimum": 0
+    },
+    "rectangularityResidualMeters": {
+      "type": "number",
+      "minimum": 0
+    },
+    "measuredBy": {
+      "type": "string",
+      "enum": [
+        "tape",
+        "laser",
+        "nominal"
+      ]
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 1024
+      },
+      "maxItems": 32
+    }
+  }
+}

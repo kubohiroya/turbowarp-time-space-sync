@@ -1,0 +1,17 @@
+{
+  "schema": "twtss/placement-observation",
+  "version": 1,
+  "cameraId": "camera-left",
+  "referenceId": "wall-projection",
+  "intrinsicProfileId": "cal-2026-09-15-left",
+  "imagePoints": [
+    {"id": "tl", "u": 412.5, "v": 233.1},
+    {"id": "tr", "u": 902.8, "v": 241.7},
+    {"id": "br", "u": 913.4, "v": 559.2},
+    {"id": "bl", "u": 401.9, "v": 548.6}
+  ],
+  "imageWidth": 1280,
+  "imageHeight": 720,
+  "capturedAtUs": 1737000000000000,
+  "conditions": {"frameRate": 30, "exposureTimeUs": 8000}
+}
