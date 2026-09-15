@@ -1,0 +1,96 @@
+{
+  "note": "The fold rule shared with the transport. Both repositories assert against this file.",
+  "source": {
+    "repository": "kubohiroya/turbowarp-webrtc",
+    "path": "src/frame-sync.ts",
+    "symbol": "frameLatencyUs",
+    "commit": "24f05dab074bef9cbed467a3f1d28e4b736bb625",
+    "note": "Not importable: the published ./sync sub-entry carries the wire contracts only."
+  },
+  "cases": [
+    {
+      "captureUs": 1000,
+      "patternUs": 400,
+      "wrapUs": 0,
+      "latencyUs": 600
+    },
+    {
+      "captureUs": 400,
+      "patternUs": 1000,
+      "wrapUs": 0,
+      "latencyUs": -600
+    },
+    {
+      "captureUs": 5000000,
+      "patternUs": 4950000,
+      "wrapUs": 4096000,
+      "latencyUs": 50000
+    },
+    {
+      "captureUs": 1737000000000000,
+      "patternUs": 1736999999950000,
+      "wrapUs": 4096000,
+      "latencyUs": 50000
+    },
+    {
+      "captureUs": 1000000,
+      "patternUs": 1020000,
+      "wrapUs": 4096000,
+      "latencyUs": -20000
+    },
+    {
+      "captureUs": 1000000,
+      "patternUs": 1000001,
+      "wrapUs": 4096000,
+      "latencyUs": -1
+    },
+    {
+      "captureUs": 2047999,
+      "patternUs": 0,
+      "wrapUs": 4096000,
+      "latencyUs": 2047999
+    },
+    {
+      "captureUs": 2048000,
+      "patternUs": 0,
+      "wrapUs": 4096000,
+      "latencyUs": -2048000
+    },
+    {
+      "captureUs": 2048001,
+      "patternUs": 0,
+      "wrapUs": 4096000,
+      "latencyUs": -2047999
+    },
+    {
+      "captureUs": 0,
+      "patternUs": 2047999,
+      "wrapUs": 4096000,
+      "latencyUs": -2047999
+    },
+    {
+      "captureUs": 0,
+      "patternUs": 2048000,
+      "wrapUs": 4096000,
+      "latencyUs": -2048000
+    },
+    {
+      "captureUs": 4097000,
+      "patternUs": 500,
+      "wrapUs": 4096000,
+      "latencyUs": 500
+    },
+    {
+      "captureUs": 500,
+      "patternUs": 4097000,
+      "wrapUs": 4096000,
+      "latencyUs": -500
+    },
+    {
+      "captureUs": 12300345,
+      "patternUs": 6789,
+      "wrapUs": 4096000,
+      "latencyUs": 5556
+    }
+  ]
+}

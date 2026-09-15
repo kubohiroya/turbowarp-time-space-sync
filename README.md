@@ -313,6 +313,60 @@ Returns the shortest calibration window in which every pattern cell is guarantee
 | Type | Reporter |
 | Opcode | `opticalTimeMinimumCalibrationSeconds` |
 
+### `estimate time correspondence`
+
+Intersects the observations collected so far into one delay. A reading bounds the delay rather than measuring it, so the result is the set of delays every reading allows; when a strict majority cannot agree on any, nothing is published.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `estimateTimeCorrespondence` |
+
+### `time correspondence JSON`
+
+Returns the last estimate as twtss/time-correspondence version 1 JSON, or an empty string when none has been made.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `timeCorrespondenceJson` |
+
+### `time correspondence error`
+
+Returns why the last estimate could not be made, or an empty string when it succeeded.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `timeCorrespondenceError` |
+
+### `display to timestamp delay us`
+
+Returns how much later a frame is stamped than the pattern it shows was drawn, in microseconds. This is not a clock offset: an optical reading constrains only the sum of the clock offset and the two pipeline delays, and the components folded in are listed in the JSON.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `displayToTimestampDelayUs` |
+
+### `time correspondence uncertainty us`
+
+Returns half the width of the delays the readings agree on. It shrinks as readings accumulate and never reaches zero, because one refresh of the display is never resolved.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `timeCorrespondenceUncertaintyUs` |
+
+### `time correspondence current?`
+
+Reports whether the last estimate still describes the present. Every estimate expires: one measured before the camera refocused or the clock was re-estimated is not a smaller measurement but a measurement of something else.
+
+| Property | Value |
+|---|---|
+| Type | Boolean |
+| Opcode | `timeCorrespondenceCurrent` |
+
 <!-- END GENERATED BLOCKS -->
 
 ## License

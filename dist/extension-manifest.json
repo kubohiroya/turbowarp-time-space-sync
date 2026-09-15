@@ -18,6 +18,16 @@
       ]
     },
     {
+      "opcode": "displayToTimestampDelayUs",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "estimateTimeCorrespondence",
+      "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
       "opcode": "hideTimePattern",
       "blockType": "COMMAND",
       "arguments": []
@@ -107,6 +117,26 @@
     {
       "opcode": "takeOpticalTimeObservation",
       "blockType": "COMMAND",
+      "arguments": []
+    },
+    {
+      "opcode": "timeCorrespondenceCurrent",
+      "blockType": "BOOLEAN",
+      "arguments": []
+    },
+    {
+      "opcode": "timeCorrespondenceError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "timeCorrespondenceJson",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "timeCorrespondenceUncertaintyUs",
+      "blockType": "REPORTER",
       "arguments": []
     },
     {

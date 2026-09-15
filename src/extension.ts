@@ -5,7 +5,9 @@ import {extensionConfig} from './config.js';
 import {
   TimeSpaceSyncError,
   errorCodeOf,
+  isCurrent,
   type OpticalTimeObservation,
+  type TimeCorrespondence,
   type TimeSpaceSyncErrorCode
 } from './contracts/index.js';
 import {
@@ -13,6 +15,7 @@ import {
   PATTERN_PROFILE_V1,
   PatternDisplay,
   VideoFramePump,
+  estimateTimeCorrespondence,
   wrapUs,
   type OpticalTimeStartOptions,
   type OpticalTimeState,
@@ -67,6 +70,8 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
   private controller: OpticalTimeController | undefined;
   private acknowledgement: PhotosensitivityAcknowledgement | undefined;
   private observation: OpticalTimeObservation | undefined;
+  private correspondence: TimeCorrespondence | undefined;
+  private correspondenceError = '';
 
   public constructor(options: TimeSpaceSyncExtensionOptions = {}) {
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? ({} as TurboWarpRuntime);
@@ -199,6 +204,54 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
     return this.observation ? JSON.stringify(this.observation) : '';
   }
 
+  // Estimation -----------------------------------------------------------
+
+  public estimateTimeCorrespondence(): void {
+    this.requireOpticalTime();
+    const controller = this.requireController();
+    // Draining rather than peeking: an estimate is made from a stretch of
+    // readings, and leaving them queued would let the next estimate count the
+    // same ones again and report a confidence they do not support.
+    const observations = controller.drainObservations();
+    const result = estimateTimeCorrespondence(observations, {
+      nowUs: this.clock.nowUs(),
+      decodeRate: controller.decodeRate(),
+      droppedCount: controller.droppedCount(),
+      rejectedCount: controller.rejectedCount()
+    });
+    if (result.ok) {
+      this.correspondence = result.correspondence;
+      this.correspondenceError = '';
+      return;
+    }
+    // The previous estimate is dropped rather than left standing: it describes
+    // a stretch of time that has passed, and a reader asking again now is
+    // asking about now.
+    this.correspondence = undefined;
+    this.correspondenceError = result.code;
+  }
+
+  public timeCorrespondenceJson(): string {
+    return this.correspondence ? JSON.stringify(this.correspondence) : '';
+  }
+
+  public timeCorrespondenceError(): string {
+    return this.correspondenceError;
+  }
+
+  public displayToTimestampDelayUs(): number {
+    return this.correspondence?.displayToTimestampDelayUs ?? 0;
+  }
+
+  public timeCorrespondenceUncertaintyUs(): number {
+    return this.correspondence?.uncertaintyUs ?? 0;
+  }
+
+  public timeCorrespondenceCurrent(): boolean {
+    const correspondence = this.correspondence;
+    return correspondence !== undefined && isCurrent(correspondence, this.clock.nowUs());
+  }
+
   public opticalTimeMinimumCalibrationSeconds(): number {
     return this.requireController().minimumCalibrationSeconds();
   }
@@ -304,6 +357,8 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
       void this.controller?.stop().catch(() => undefined);
       this.display?.hide();
       this.observation = undefined;
+      this.correspondence = undefined;
+      this.correspondenceError = '';
       this.acknowledgement = undefined;
     };
     for (const event of ['PROJECT_STOP_ALL', 'PROJECT_LOADED', 'RUNTIME_DISPOSED']) {
