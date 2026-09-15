@@ -246,6 +246,99 @@
       "text": "time correspondence current?",
       "description": "Reports whether the last estimate still describes the present. Every estimate expires: one measured before the camera refocused or the clock was re-estimated is not a smaller measurement but a measurement of something else.",
       "arguments": {}
+    },
+    {
+      "opcode": "defineReference",
+      "feature": "placementSolveV1",
+      "blockType": "COMMAND",
+      "text": "define reference [REFERENCE_JSON]",
+      "description": "Stores a twtss/placement-reference version 1 document: the measured position of each point on the reference, with how well each was measured. Corners are listed individually because an image thrown obliquely onto a wall is a general quadrilateral, and describing it by a width and a height bakes a scale error into every pose solved from it.",
+      "arguments": {
+        "REFERENCE_JSON": {
+          "type": "STRING",
+          "defaultValue": "{}"
+        }
+      }
+    },
+    {
+      "opcode": "addPlacementObservation",
+      "feature": "placementSolveV1",
+      "blockType": "COMMAND",
+      "text": "add placement observation [OBSERVATION_JSON]",
+      "description": "Stores where one camera saw the reference points, in unmirrored source pixels. Marks are matched to the reference by name; a mark whose name is unknown is dropped rather than matched by position.",
+      "arguments": {
+        "OBSERVATION_JSON": {
+          "type": "STRING",
+          "defaultValue": "{}"
+        }
+      }
+    },
+    {
+      "opcode": "setCameraModel",
+      "feature": "placementSolveV1",
+      "blockType": "COMMAND",
+      "text": "set camera model for [CAMERA_ID] to [MODEL_JSON]",
+      "description": "Supplies the intrinsics and distortion to interpret one camera pixels with. Take these from Camera Source rather than scaling a calibration profile yourself: only it can tell a scaled capture from a cropped one.",
+      "arguments": {
+        "CAMERA_ID": {
+          "type": "STRING",
+          "defaultValue": "default"
+        },
+        "MODEL_JSON": {
+          "type": "STRING",
+          "defaultValue": "{}"
+        }
+      }
+    },
+    {
+      "opcode": "solvePlacement",
+      "feature": "placementSolveV1",
+      "blockType": "COMMAND",
+      "text": "solve placement for rig [RIG_ID]",
+      "description": "Places every camera that observed the reference and works out where they stand relative to each other. A camera whose view fits two poses about equally well is refused rather than placed: a small reprojection error says the pose explains the image, not that the image chose it.",
+      "arguments": {
+        "RIG_ID": {
+          "type": "STRING",
+          "defaultValue": "rig"
+        }
+      }
+    },
+    {
+      "opcode": "placementResultJson",
+      "feature": "placementSolveV1",
+      "blockType": "REPORTER",
+      "text": "placement result JSON",
+      "description": "Returns the last placement as twtss/placement-result version 1 JSON, or an empty string when none has been solved.",
+      "arguments": {}
+    },
+    {
+      "opcode": "placementError",
+      "feature": "placementSolveV1",
+      "blockType": "REPORTER",
+      "text": "placement error",
+      "description": "Returns why the last placement could not be solved, or an empty string when it succeeded.",
+      "arguments": {}
+    },
+    {
+      "opcode": "placementReprojectionRms",
+      "feature": "placementSolveV1",
+      "blockType": "REPORTER",
+      "text": "placement reprojection RMS for [CAMERA_ID]",
+      "description": "Returns the reprojection error of one camera placement, in pixels.",
+      "arguments": {
+        "CAMERA_ID": {
+          "type": "STRING",
+          "defaultValue": "default"
+        }
+      }
+    },
+    {
+      "opcode": "clearPlacement",
+      "feature": "placementSolveV1",
+      "blockType": "COMMAND",
+      "text": "clear placement observations",
+      "description": "Forgets the stored reference, observations, camera models and result.",
+      "arguments": {}
     }
   ]
 }

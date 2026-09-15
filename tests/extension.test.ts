@@ -42,7 +42,10 @@ describe('block surface', () => {
       opticalTimeEnabled: true
     }).getInfo() as {name: string; blocks: Array<{opcode: string; text: string}>};
     expect(info.name).toBe('TurboWarp-Time-Space-Sync');
-    expect(info.blocks).toHaveLength(definitions.blocks.length);
+    // Only the optical time blocks: each feature is opted into on its own.
+    expect(info.blocks).toHaveLength(
+      definitions.blocks.filter((block) => block.feature === 'opticalTimeSyncV1').length
+    );
     expect(info.blocks.map((block) => block.opcode)).toContain('showTimePattern');
   });
 
@@ -56,7 +59,8 @@ describe('block surface', () => {
   it('implements every opcode it publishes', () => {
     const extension = new TimeSpaceSyncExtension({
       runtime: runtime(),
-      opticalTimeEnabled: true
+      opticalTimeEnabled: true,
+      placementEnabled: true
     }) as unknown as Record<string, unknown>;
     for (const block of definitions.blocks) {
       expect(typeof extension[block.opcode]).toBe('function');
@@ -164,5 +168,51 @@ describe('estimation through the blocks', () => {
     // Not zero because the delay is zero: zero because there is no answer. The
     // error reporter is what tells the two apart.
     expect(extension.displayToTimestampDelayUs()).toBe(0);
+  });
+});
+
+describe('placement through the blocks', () => {
+  function enabled() {
+    return new TimeSpaceSyncExtension({
+      runtime: runtime(),
+      opticalTimeEnabled: true,
+      placementEnabled: true
+    });
+  }
+
+  it('keeps the placement blocks out of the palette while the feature is off', () => {
+    const info = new TimeSpaceSyncExtension({
+      runtime: runtime(),
+      opticalTimeEnabled: true
+    }).getInfo() as {blocks: Array<{opcode: string}>};
+    const opcodes = info.blocks.map((block) => block.opcode);
+    expect(opcodes).toContain('showTimePattern');
+    expect(opcodes).not.toContain('solvePlacement');
+  });
+
+  it('refuses to act on placement while the feature is off', () => {
+    const extension = new TimeSpaceSyncExtension({runtime: runtime()});
+    expect(() => extension.solvePlacement({RIG_ID: 'rig'})).toThrowError(/disabled/);
+  });
+
+  it('records a reference that does not parse as such', () => {
+    const extension = enabled();
+    extension.defineReference({REFERENCE_JSON: 'not json'});
+    expect(extension.placementError()).toBe('invalid-payload');
+  });
+
+  it('says which piece is missing before anything can be solved', () => {
+    const extension = enabled();
+    extension.solvePlacement({RIG_ID: 'rig'});
+    expect(extension.placementError()).toBe('reference-unknown');
+    expect(extension.placementResultJson()).toBe('');
+  });
+
+  it('forgets everything on request', () => {
+    const extension = enabled();
+    extension.defineReference({REFERENCE_JSON: 'not json'});
+    extension.clearPlacement();
+    expect(extension.placementError()).toBe('');
+    expect(extension.placementReprojectionRms({CAMERA_ID: 'any'})).toBe(0);
   });
 });

@@ -367,6 +367,84 @@ Reports whether the last estimate still describes the present. Every estimate ex
 | Type | Boolean |
 | Opcode | `timeCorrespondenceCurrent` |
 
+### `define reference [REFERENCE_JSON]`
+
+Stores a twtss/placement-reference version 1 document: the measured position of each point on the reference, with how well each was measured. Corners are listed individually because an image thrown obliquely onto a wall is a general quadrilateral, and describing it by a width and a height bakes a scale error into every pose solved from it.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `defineReference` |
+| `REFERENCE_JSON` | String, default: `{}` |
+
+### `add placement observation [OBSERVATION_JSON]`
+
+Stores where one camera saw the reference points, in unmirrored source pixels. Marks are matched to the reference by name; a mark whose name is unknown is dropped rather than matched by position.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `addPlacementObservation` |
+| `OBSERVATION_JSON` | String, default: `{}` |
+
+### `set camera model for [CAMERA_ID] to [MODEL_JSON]`
+
+Supplies the intrinsics and distortion to interpret one camera pixels with. Take these from Camera Source rather than scaling a calibration profile yourself: only it can tell a scaled capture from a cropped one.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `setCameraModel` |
+| `CAMERA_ID` | String, default: `default` |
+| `MODEL_JSON` | String, default: `{}` |
+
+### `solve placement for rig [RIG_ID]`
+
+Places every camera that observed the reference and works out where they stand relative to each other. A camera whose view fits two poses about equally well is refused rather than placed: a small reprojection error says the pose explains the image, not that the image chose it.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `solvePlacement` |
+| `RIG_ID` | String, default: `rig` |
+
+### `placement result JSON`
+
+Returns the last placement as twtss/placement-result version 1 JSON, or an empty string when none has been solved.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `placementResultJson` |
+
+### `placement error`
+
+Returns why the last placement could not be solved, or an empty string when it succeeded.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `placementError` |
+
+### `placement reprojection RMS for [CAMERA_ID]`
+
+Returns the reprojection error of one camera placement, in pixels.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `placementReprojectionRms` |
+| `CAMERA_ID` | String, default: `default` |
+
+### `clear placement observations`
+
+Forgets the stored reference, observations, camera models and result.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `clearPlacement` |
+
 <!-- END GENERATED BLOCKS -->
 
 ## License

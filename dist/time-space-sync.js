@@ -272,6 +272,91 @@
   			"text": "time correspondence current?",
   			"description": "Reports whether the last estimate still describes the present. Every estimate expires: one measured before the camera refocused or the clock was re-estimated is not a smaller measurement but a measurement of something else.",
   			"arguments": {}
+  		},
+  		{
+  			"opcode": "defineReference",
+  			"feature": "placementSolveV1",
+  			"blockType": "COMMAND",
+  			"text": "define reference [REFERENCE_JSON]",
+  			"description": "Stores a twtss/placement-reference version 1 document: the measured position of each point on the reference, with how well each was measured. Corners are listed individually because an image thrown obliquely onto a wall is a general quadrilateral, and describing it by a width and a height bakes a scale error into every pose solved from it.",
+  			"arguments": { "REFERENCE_JSON": {
+  				"type": "STRING",
+  				"defaultValue": "{}"
+  			} }
+  		},
+  		{
+  			"opcode": "addPlacementObservation",
+  			"feature": "placementSolveV1",
+  			"blockType": "COMMAND",
+  			"text": "add placement observation [OBSERVATION_JSON]",
+  			"description": "Stores where one camera saw the reference points, in unmirrored source pixels. Marks are matched to the reference by name; a mark whose name is unknown is dropped rather than matched by position.",
+  			"arguments": { "OBSERVATION_JSON": {
+  				"type": "STRING",
+  				"defaultValue": "{}"
+  			} }
+  		},
+  		{
+  			"opcode": "setCameraModel",
+  			"feature": "placementSolveV1",
+  			"blockType": "COMMAND",
+  			"text": "set camera model for [CAMERA_ID] to [MODEL_JSON]",
+  			"description": "Supplies the intrinsics and distortion to interpret one camera pixels with. Take these from Camera Source rather than scaling a calibration profile yourself: only it can tell a scaled capture from a cropped one.",
+  			"arguments": {
+  				"CAMERA_ID": {
+  					"type": "STRING",
+  					"defaultValue": "default"
+  				},
+  				"MODEL_JSON": {
+  					"type": "STRING",
+  					"defaultValue": "{}"
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "solvePlacement",
+  			"feature": "placementSolveV1",
+  			"blockType": "COMMAND",
+  			"text": "solve placement for rig [RIG_ID]",
+  			"description": "Places every camera that observed the reference and works out where they stand relative to each other. A camera whose view fits two poses about equally well is refused rather than placed: a small reprojection error says the pose explains the image, not that the image chose it.",
+  			"arguments": { "RIG_ID": {
+  				"type": "STRING",
+  				"defaultValue": "rig"
+  			} }
+  		},
+  		{
+  			"opcode": "placementResultJson",
+  			"feature": "placementSolveV1",
+  			"blockType": "REPORTER",
+  			"text": "placement result JSON",
+  			"description": "Returns the last placement as twtss/placement-result version 1 JSON, or an empty string when none has been solved.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "placementError",
+  			"feature": "placementSolveV1",
+  			"blockType": "REPORTER",
+  			"text": "placement error",
+  			"description": "Returns why the last placement could not be solved, or an empty string when it succeeded.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "placementReprojectionRms",
+  			"feature": "placementSolveV1",
+  			"blockType": "REPORTER",
+  			"text": "placement reprojection RMS for [CAMERA_ID]",
+  			"description": "Returns the reprojection error of one camera placement, in pixels.",
+  			"arguments": { "CAMERA_ID": {
+  				"type": "STRING",
+  				"defaultValue": "default"
+  			} }
+  		},
+  		{
+  			"opcode": "clearPlacement",
+  			"feature": "placementSolveV1",
+  			"blockType": "COMMAND",
+  			"text": "clear placement observations",
+  			"description": "Forgets the stored reference, observations, camera models and result.",
+  			"arguments": {}
   		}
   	]
   };
@@ -339,6 +424,24 @@
   function errorCodeOf(error) {
   	return error instanceof TimeSpaceSyncError ? error.code : "invalid-payload";
   }
+  //#endregion
+  //#region src/contracts/spec.ts
+  var IDENTIFIER_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$";
+  /** An opaque, stable identifier: a camera slot, a reference, a profile. */
+  function identifier() {
+  	return {
+  		kind: "string",
+  		minLength: 1,
+  		maxLength: 128,
+  		pattern: IDENTIFIER_PATTERN
+  	};
+  }
+  function text(maxLength = 1024) {
+  	return {
+  		kind: "string",
+  		maxLength
+  	};
+  }
   /**
   * A finite number. `Number.isFinite` is the point of this helper: a NaN or an
   * infinity that reaches a solver produces a result that looks like a number,
@@ -358,12 +461,293 @@
   		...bounds
   	};
   }
+  /**
+  * A duration that cannot be negative, in microseconds.
+  *
+  * A negative duration is always a bug in the producer, never a measurement, so
+  * it is rejected rather than clamped. Clamping would hide the producer's bug
+  * behind a plausible zero.
+  */
+  function durationUs() {
+  	return {
+  		kind: "number",
+  		integer: true,
+  		minimum: 0
+  	};
+  }
+  function timestampUs() {
+  	return {
+  		kind: "number",
+  		integer: true
+  	};
+  }
+  function enumOf(values) {
+  	return {
+  		kind: "enum",
+  		values
+  	};
+  }
+  function object(properties, optional = []) {
+  	return {
+  		kind: "object",
+  		properties,
+  		optional
+  	};
+  }
+  function validate(spec, value) {
+  	const issues = [];
+  	check(spec, value, "", issues);
+  	if (issues.length > 0) return {
+  		ok: false,
+  		issues
+  	};
+  	return {
+  		ok: true,
+  		value
+  	};
+  }
+  function check(spec, value, path, issues) {
+  	switch (spec.kind) {
+  		case "const":
+  			if (value !== spec.value) issues.push({
+  				path,
+  				message: `must be ${JSON.stringify(spec.value)}`
+  			});
+  			return;
+  		case "boolean":
+  			if (typeof value !== "boolean") issues.push({
+  				path,
+  				message: "must be a boolean"
+  			});
+  			return;
+  		case "string":
+  			checkString(spec, value, path, issues);
+  			return;
+  		case "enum":
+  			if (typeof value !== "string" || !spec.values.includes(value)) issues.push({
+  				path,
+  				message: `must be one of ${spec.values.join(", ")}`
+  			});
+  			return;
+  		case "number":
+  			checkNumber(spec, value, path, issues);
+  			return;
+  		case "array":
+  			checkArray(spec, value, path, issues);
+  			return;
+  		case "tuple":
+  			checkTuple(spec, value, path, issues);
+  			return;
+  		case "object":
+  			checkObject(spec, value, path, issues);
+  			return;
+  		case "nullable":
+  			if (value !== null) check(spec.inner, value, path, issues);
+  			return;
+  	}
+  }
+  function checkString(spec, value, path, issues) {
+  	if (typeof value !== "string") {
+  		issues.push({
+  			path,
+  			message: "must be a string"
+  		});
+  		return;
+  	}
+  	if (spec.minLength !== void 0 && value.length < spec.minLength) issues.push({
+  		path,
+  		message: `must be at least ${spec.minLength} characters`
+  	});
+  	if (spec.maxLength !== void 0 && value.length > spec.maxLength) issues.push({
+  		path,
+  		message: `must be at most ${spec.maxLength} characters`
+  	});
+  	if (spec.pattern !== void 0 && !new RegExp(spec.pattern).test(value)) issues.push({
+  		path,
+  		message: `must match ${spec.pattern}`
+  	});
+  }
+  function checkNumber(spec, value, path, issues) {
+  	if (typeof value !== "number" || !Number.isFinite(value)) {
+  		issues.push({
+  			path,
+  			message: "must be a finite number"
+  		});
+  		return;
+  	}
+  	if (spec.integer === true && !Number.isSafeInteger(value)) {
+  		issues.push({
+  			path,
+  			message: "must be a safe integer"
+  		});
+  		return;
+  	}
+  	if (spec.minimum !== void 0 && value < spec.minimum) issues.push({
+  		path,
+  		message: `must be at least ${spec.minimum}`
+  	});
+  	if (spec.exclusiveMinimum !== void 0 && value <= spec.exclusiveMinimum) issues.push({
+  		path,
+  		message: `must be greater than ${spec.exclusiveMinimum}`
+  	});
+  	if (spec.maximum !== void 0 && value > spec.maximum) issues.push({
+  		path,
+  		message: `must be at most ${spec.maximum}`
+  	});
+  }
+  function checkArray(spec, value, path, issues) {
+  	if (!Array.isArray(value)) {
+  		issues.push({
+  			path,
+  			message: "must be an array"
+  		});
+  		return;
+  	}
+  	if (spec.minItems !== void 0 && value.length < spec.minItems) issues.push({
+  		path,
+  		message: `must have at least ${spec.minItems} items`
+  	});
+  	if (spec.maxItems !== void 0 && value.length > spec.maxItems) issues.push({
+  		path,
+  		message: `must have at most ${spec.maxItems} items`
+  	});
+  	value.forEach((item, index) => check(spec.items, item, `${path}[${index}]`, issues));
+  }
+  function checkTuple(spec, value, path, issues) {
+  	if (!Array.isArray(value) || value.length !== spec.length) {
+  		issues.push({
+  			path,
+  			message: `must be an array of ${spec.length} items`
+  		});
+  		return;
+  	}
+  	value.forEach((item, index) => check(spec.items, item, `${path}[${index}]`, issues));
+  }
+  function checkObject(spec, value, path, issues) {
+  	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  		issues.push({
+  			path,
+  			message: "must be an object"
+  		});
+  		return;
+  	}
+  	const record = value;
+  	const optional = new Set(spec.optional ?? []);
+  	for (const [name, property] of Object.entries(spec.properties)) {
+  		const child = path === "" ? name : `${path}.${name}`;
+  		if (!(name in record)) {
+  			if (!optional.has(name)) issues.push({
+  				path: child,
+  				message: "is required"
+  			});
+  			continue;
+  		}
+  		if (record[name] === void 0) {
+  			issues.push({
+  				path: child,
+  				message: "must not be undefined"
+  			});
+  			continue;
+  		}
+  		check(property, record[name], child, issues);
+  	}
+  	for (const name of Object.keys(record)) if (!(name in spec.properties)) {
+  		const child = path === "" ? name : `${path}.${name}`;
+  		issues.push({
+  			path: child,
+  			message: "is not a known property"
+  		});
+  	}
+  }
   integer({ minimum: 0 });
   /** True when two domain readings may be compared without conversion. */
   function sameClockDomain(left, right) {
   	return left.id === right.id && left.epoch === right.epoch;
   }
   finite();
+  /** Rotation part in row-major 3x3 order. */
+  function rotationOf(matrix) {
+  	return [
+  		0,
+  		1,
+  		2,
+  		4,
+  		5,
+  		6,
+  		8,
+  		9,
+  		10
+  	].map((index) => at$1(matrix, index));
+  }
+  function translationOf(matrix) {
+  	return [
+  		3,
+  		7,
+  		11
+  	].map((index) => at$1(matrix, index));
+  }
+  /** `bFromA` composed after `cFromB` gives `cFromA`. */
+  function composeRigidTransforms(cFromB, bFromA) {
+  	const result = new Array(16).fill(0);
+  	for (let row = 0; row < 4; row += 1) for (let column = 0; column < 4; column += 1) {
+  		let total = 0;
+  		for (let k = 0; k < 4; k += 1) total += at$1(cFromB, row * 4 + k) * at$1(bFromA, k * 4 + column);
+  		result[row * 4 + column] = total;
+  	}
+  	return result;
+  }
+  /** Turns `bFromA` into `aFromB`, transposing the rotation. */
+  function invertRigidTransform(matrix) {
+  	const rotation = rotationOf(matrix);
+  	const translation = translationOf(matrix);
+  	const transposed = [
+  		0,
+  		3,
+  		6,
+  		1,
+  		4,
+  		7,
+  		2,
+  		5,
+  		8
+  	].map((index) => at$1(rotation, index));
+  	const moved = [
+  		0,
+  		1,
+  		2
+  	].map((row) => {
+  		let total = 0;
+  		for (let k = 0; k < 3; k += 1) total += at$1(transposed, row * 3 + k) * at$1(translation, k);
+  		return -total;
+  	});
+  	return [
+  		at$1(transposed, 0),
+  		at$1(transposed, 1),
+  		at$1(transposed, 2),
+  		at$1(moved, 0),
+  		at$1(transposed, 3),
+  		at$1(transposed, 4),
+  		at$1(transposed, 5),
+  		at$1(moved, 1),
+  		at$1(transposed, 6),
+  		at$1(transposed, 7),
+  		at$1(transposed, 8),
+  		at$1(moved, 2),
+  		0,
+  		0,
+  		0,
+  		1
+  	];
+  }
+  /** Distance between the origins of the two frames, in metres. */
+  function baselineMeters(left, right) {
+  	const a = translationOf(invertRigidTransform(left));
+  	const b = translationOf(invertRigidTransform(right));
+  	return Math.hypot(at$1(a, 0) - at$1(b, 0), at$1(a, 1) - at$1(b, 1), at$1(a, 2) - at$1(b, 2));
+  }
+  function at$1(values, index) {
+  	return values[index] ?? 0;
+  }
   //#endregion
   //#region src/contracts/optical-time-observation.ts
   var OPTICAL_TIME_OBSERVATION_SCHEMA = "twtss/optical-time-observation";
@@ -381,10 +765,118 @@
   function isCurrent(result, nowUs) {
   	return nowUs < result.validUntilUs;
   }
-  finite(), finite(), finite(), finite({ minimum: 0 });
-  finite({ minimum: 0 }), finite({ minimum: 0 });
-  finite({ minimum: 0 }), finite({ minimum: 0 }), integer({ minimum: 1 }), integer({ minimum: 1 }), finite({ exclusiveMinimum: 0 });
+  //#endregion
+  //#region src/contracts/placement.ts
+  var PLACEMENT_REFERENCE_SCHEMA = "twtss/placement-reference";
+  var PLACEMENT_OBSERVATION_SCHEMA = "twtss/placement-observation";
+  var PLACEMENT_RESULT_SCHEMA = "twtss/placement-result";
+  var referencePointSpec = object({
+  	id: identifier(),
+  	x: finite(),
+  	y: finite(),
+  	z: finite(),
+  	sigmaMeters: finite({ minimum: 0 })
+  });
+  var referenceDefinitionSpec = object({
+  	schema: {
+  		kind: "const",
+  		value: PLACEMENT_REFERENCE_SCHEMA
+  	},
+  	version: {
+  		kind: "const",
+  		value: 1
+  	},
+  	referenceId: identifier(),
+  	kind: enumOf([
+  		"screen",
+  		"projection",
+  		"board",
+  		"custom"
+  	]),
+  	points: {
+  		kind: "array",
+  		items: referencePointSpec,
+  		minItems: 4,
+  		maxItems: 1024
+  	},
+  	planarityResidualMeters: finite({ minimum: 0 }),
+  	rectangularityResidualMeters: finite({ minimum: 0 }),
+  	measuredBy: enumOf([
+  		"tape",
+  		"laser",
+  		"nominal"
+  	]),
+  	notes: {
+  		kind: "array",
+  		items: text(),
+  		maxItems: 32
+  	}
+  });
+  var placementObservationSpec = object({
+  	schema: {
+  		kind: "const",
+  		value: PLACEMENT_OBSERVATION_SCHEMA
+  	},
+  	version: {
+  		kind: "const",
+  		value: 1
+  	},
+  	cameraId: identifier(),
+  	referenceId: identifier(),
+  	intrinsicProfileId: identifier(),
+  	imagePoints: {
+  		kind: "array",
+  		items: object({
+  			id: identifier(),
+  			u: finite({ minimum: 0 }),
+  			v: finite({ minimum: 0 })
+  		}),
+  		minItems: 4,
+  		maxItems: 1024
+  	},
+  	imageWidth: integer({ minimum: 1 }),
+  	imageHeight: integer({ minimum: 1 }),
+  	capturedAtUs: timestampUs(),
+  	conditions: object({
+  		frameRate: finite({ exclusiveMinimum: 0 }),
+  		exposureTimeUs: durationUs()
+  	}, ["frameRate", "exposureTimeUs"])
+  });
   finite({ minimum: 0 }), finite({ minimum: 0 }), integer({ minimum: 4 }), finite({ minimum: 0 }), finite({ minimum: 0 }), finite({ minimum: 0 }), finite({ minimum: 0 }), finite({ minimum: 0 }), finite({ minimum: 0 }), finite({ minimum: 0 }), finite();
+  function referenceDefinitionIssues(reference) {
+  	const issues = [];
+  	if (new Set(reference.points.map((point) => point.id)).size !== reference.points.length) issues.push("reference point ids must be unique");
+  	if (reference.measuredBy === "nominal" && reference.points.some((p) => p.sigmaMeters === 0)) issues.push("a nominal reference must carry a non-zero measurement sigma");
+  	return issues;
+  }
+  function placementObservationIssues(observation) {
+  	const issues = [];
+  	if (new Set(observation.imagePoints.map((point) => point.id)).size !== observation.imagePoints.length) issues.push("image point ids must be unique");
+  	for (const point of observation.imagePoints) if (point.u > observation.imageWidth || point.v > observation.imageHeight) {
+  		issues.push(`image point ${point.id} falls outside the image`);
+  		break;
+  	}
+  	return issues;
+  }
+  function parseReferenceDefinition(value) {
+  	return parseWith(referenceDefinitionSpec, value, referenceDefinitionIssues);
+  }
+  function parsePlacementObservation(value) {
+  	return parseWith(placementObservationSpec, value, placementObservationIssues);
+  }
+  function parseWith(spec, value, extra) {
+  	const result = validate(spec, value);
+  	if (!result.ok) return result;
+  	const issues = extra(result.value);
+  	if (issues.length > 0) return {
+  		ok: false,
+  		issues: issues.map((message) => ({
+  			path: "",
+  			message
+  		}))
+  	};
+  	return result;
+  }
   //#endregion
   //#region src/clock/session-clock.ts
   /**
@@ -2325,6 +2817,948 @@
   	return low + ((sorted[upper] ?? low) - low) * (position - lower);
   }
   //#endregion
+  //#region src/placement/linear-algebra.ts
+  function multiply(left, right, rows, inner, columns) {
+  	const result = new Array(rows * columns).fill(0);
+  	for (let row = 0; row < rows; row += 1) for (let column = 0; column < columns; column += 1) {
+  		let total = 0;
+  		for (let k = 0; k < inner; k += 1) total += (left[row * inner + k] ?? 0) * (right[k * columns + column] ?? 0);
+  		result[row * columns + column] = total;
+  	}
+  	return result;
+  }
+  function transpose(values, rows, columns) {
+  	const result = new Array(rows * columns).fill(0);
+  	for (let row = 0; row < rows; row += 1) for (let column = 0; column < columns; column += 1) result[column * rows + row] = values[row * columns + column] ?? 0;
+  	return result;
+  }
+  /**
+  * Eigen decomposition of a symmetric matrix, by cyclic Jacobi rotations.
+  *
+  * Used for two things: the smallest eigenvector of `AᵀA`, which is the
+  * homogeneous least-squares solution a homography needs, and the parameter
+  * covariance a refinement leaves behind. Jacobi is chosen over anything faster
+  * because the matrices are nine by nine at most and it needs no pivoting, no
+  * balancing and no special cases to be correct.
+  */
+  function symmetricEigen(matrix, size, sweeps = 60) {
+  	const a = [...matrix];
+  	const v = new Array(size * size).fill(0);
+  	for (let index = 0; index < size; index += 1) v[index * size + index] = 1;
+  	for (let sweep = 0; sweep < sweeps; sweep += 1) {
+  		let off = 0;
+  		for (let p = 0; p < size; p += 1) for (let q = p + 1; q < size; q += 1) off += (a[p * size + q] ?? 0) ** 2;
+  		if (off < 1e-24) break;
+  		for (let p = 0; p < size; p += 1) for (let q = p + 1; q < size; q += 1) {
+  			const apq = a[p * size + q] ?? 0;
+  			if (Math.abs(apq) < 1e-30) continue;
+  			const app = a[p * size + p] ?? 0;
+  			const theta = ((a[q * size + q] ?? 0) - app) / (2 * apq);
+  			const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+  			const c = 1 / Math.sqrt(t * t + 1);
+  			const s = t * c;
+  			for (let k = 0; k < size; k += 1) {
+  				const akp = a[k * size + p] ?? 0;
+  				const akq = a[k * size + q] ?? 0;
+  				a[k * size + p] = c * akp - s * akq;
+  				a[k * size + q] = s * akp + c * akq;
+  			}
+  			for (let k = 0; k < size; k += 1) {
+  				const apk = a[p * size + k] ?? 0;
+  				const aqk = a[q * size + k] ?? 0;
+  				a[p * size + k] = c * apk - s * aqk;
+  				a[q * size + k] = s * apk + c * aqk;
+  			}
+  			for (let k = 0; k < size; k += 1) {
+  				const vkp = v[k * size + p] ?? 0;
+  				const vkq = v[k * size + q] ?? 0;
+  				v[k * size + p] = c * vkp - s * vkq;
+  				v[k * size + q] = s * vkp + c * vkq;
+  			}
+  		}
+  	}
+  	const order = Array.from({ length: size }, (_, index) => index).sort((left, right) => (a[left * size + left] ?? 0) - (a[right * size + right] ?? 0));
+  	const values = order.map((index) => a[index * size + index] ?? 0);
+  	const vectors = new Array(size * size).fill(0);
+  	order.forEach((source, target) => {
+  		for (let row = 0; row < size; row += 1) vectors[row * size + target] = v[row * size + source] ?? 0;
+  	});
+  	return {
+  		values,
+  		vectors
+  	};
+  }
+  /** Column `index` of a row-major square matrix. */
+  function columnOf(matrix, size, index) {
+  	return Array.from({ length: size }, (_, row) => matrix[row * size + index] ?? 0);
+  }
+  /**
+  * Solves a symmetric positive definite system by Cholesky.
+  *
+  * Returns undefined rather than a large wrong answer when the matrix is not
+  * positive definite, which is what a degenerate set of correspondences
+  * produces: there the problem has no unique solution and saying so is the
+  * result.
+  */
+  function solveSymmetric(matrix, rhs, size) {
+  	const l = new Array(size * size).fill(0);
+  	for (let row = 0; row < size; row += 1) for (let column = 0; column <= row; column += 1) {
+  		let total = matrix[row * size + column] ?? 0;
+  		for (let k = 0; k < column; k += 1) total -= (l[row * size + k] ?? 0) * (l[column * size + k] ?? 0);
+  		if (row === column) {
+  			if (!(total > 0) || !Number.isFinite(total)) return void 0;
+  			l[row * size + column] = Math.sqrt(total);
+  		} else {
+  			const pivot = l[column * size + column] ?? 0;
+  			if (pivot === 0) return void 0;
+  			l[row * size + column] = total / pivot;
+  		}
+  	}
+  	const y = new Array(size).fill(0);
+  	for (let row = 0; row < size; row += 1) {
+  		let total = rhs[row] ?? 0;
+  		for (let k = 0; k < row; k += 1) total -= (l[row * size + k] ?? 0) * (y[k] ?? 0);
+  		y[row] = total / (l[row * size + row] ?? 1);
+  	}
+  	const x = new Array(size).fill(0);
+  	for (let row = size - 1; row >= 0; row -= 1) {
+  		let total = y[row] ?? 0;
+  		for (let k = row + 1; k < size; k += 1) total -= (l[k * size + row] ?? 0) * (x[k] ?? 0);
+  		x[row] = total / (l[row * size + row] ?? 1);
+  	}
+  	return x.every((value) => Number.isFinite(value)) ? x : void 0;
+  }
+  //#endregion
+  //#region src/placement/camera-model.ts
+  var UNDISTORT_ITERATIONS = 20;
+  /** Squared step below which the iteration has stopped moving, in normalised units. */
+  var UNDISTORT_TOLERANCE = 1e-26;
+  function requireSupportedDistortion(distortion) {
+  	if (distortion.model !== "none" && distortion.model !== "brown-conrady") throw new TimeSpaceSyncError("unsupported-distortion-model", `This build cannot undo ${String(distortion.model)} distortion, and guessing at the nearest model it knows would move the solved pose without changing the residual.`);
+  	if (distortion.model === "brown-conrady" && distortion.coefficients.length < 4) throw new TimeSpaceSyncError("unsupported-distortion-model", "Brown-Conrady distortion needs at least k1, k2, p1 and p2.");
+  	return distortion;
+  }
+  /** Pixels to ideal normalised image coordinates, with distortion removed. */
+  function normalize(point, intrinsics, distortion) {
+  	const y = (point.v - intrinsics.cy) / intrinsics.fy;
+  	const x = (point.u - intrinsics.cx - intrinsics.skew * y) / intrinsics.fx;
+  	return distortion.model === "none" ? {
+  		x,
+  		y
+  	} : undistort({
+  		x,
+  		y
+  	}, distortion.coefficients);
+  }
+  /** Ideal normalised coordinates back to pixels, distortion included. */
+  function project(point, intrinsics, distortion) {
+  	const distorted = distortion.model === "none" ? point : applyDistortion(point, distortion.coefficients);
+  	return {
+  		u: intrinsics.fx * distorted.x + intrinsics.skew * distorted.y + intrinsics.cx,
+  		v: intrinsics.fy * distorted.y + intrinsics.cy
+  	};
+  }
+  function applyDistortion(point, coefficients) {
+  	const k1 = coefficients[0] ?? 0;
+  	const k2 = coefficients[1] ?? 0;
+  	const p1 = coefficients[2] ?? 0;
+  	const p2 = coefficients[3] ?? 0;
+  	const k3 = coefficients[4] ?? 0;
+  	const r2 = point.x * point.x + point.y * point.y;
+  	const radial = 1 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2;
+  	return {
+  		x: point.x * radial + 2 * p1 * point.x * point.y + p2 * (r2 + 2 * point.x * point.x),
+  		y: point.y * radial + p1 * (r2 + 2 * point.y * point.y) + 2 * p2 * point.x * point.y
+  	};
+  }
+  /**
+  * Removes distortion by iterating the forward model.
+  *
+  * There is no closed form, so the observed point is used as the first guess and
+  * corrected until it stops moving. Twenty steps is far more than the handful a
+  * lens needs; the loop stops early once it converges.
+  */
+  function undistort(point, coefficients) {
+  	let current = point;
+  	for (let step = 0; step < UNDISTORT_ITERATIONS; step += 1) {
+  		const forward = applyDistortion(current, coefficients);
+  		const dx = forward.x - point.x;
+  		const dy = forward.y - point.y;
+  		current = {
+  			x: current.x - dx,
+  			y: current.y - dy
+  		};
+  		if (dx * dx + dy * dy < UNDISTORT_TOLERANCE) break;
+  	}
+  	return current;
+  }
+  //#endregion
+  //#region src/placement/reference.ts
+  function toPlanarReference(definition) {
+  	const points = definition.points;
+  	if (points.length < 4) return {
+  		ok: false,
+  		message: "A reference needs at least four measured points."
+  	};
+  	const origin = centroidOf(points);
+  	const { vectors } = symmetricEigen(scatterOf(points, origin), 3);
+  	const normal = columnOf(vectors, 3, 0);
+  	const axisU = columnOf(vectors, 3, 2);
+  	const axisV = columnOf(vectors, 3, 1);
+  	const planar = points.map((point) => ({
+  		u: dot$1(subtract(point, origin), axisU),
+  		v: dot$1(subtract(point, origin), axisV)
+  	}));
+  	const planarityResidualMeters = Math.max(...points.map((point) => Math.abs(dot$1(subtract(point, origin), normal))));
+  	let extentMeters = 0;
+  	for (let i = 0; i < planar.length; i += 1) for (let j = i + 1; j < planar.length; j += 1) {
+  		const a = planar[i];
+  		const b = planar[j];
+  		extentMeters = Math.max(extentMeters, Math.hypot(a.u - b.u, a.v - b.v));
+  	}
+  	if (!(extentMeters > 0)) return {
+  		ok: false,
+  		message: "The reference points are all in the same place."
+  	};
+  	return {
+  		ok: true,
+  		reference: {
+  			referenceId: definition.referenceId,
+  			ids: points.map((point) => point.id),
+  			planar,
+  			origin,
+  			axisU,
+  			axisV,
+  			normal,
+  			planarityResidualMeters,
+  			sigmaMeters: points.reduce((total, point) => total + point.sigmaMeters, 0) / points.length,
+  			extentMeters
+  		}
+  	};
+  }
+  function centroidOf(points) {
+  	const sum = [
+  		0,
+  		0,
+  		0
+  	];
+  	for (const point of points) {
+  		sum[0] = (sum[0] ?? 0) + point.x;
+  		sum[1] = (sum[1] ?? 0) + point.y;
+  		sum[2] = (sum[2] ?? 0) + point.z;
+  	}
+  	return sum.map((value) => value / points.length);
+  }
+  function scatterOf(points, origin) {
+  	const matrix = new Array(9).fill(0);
+  	for (const point of points) {
+  		const d = subtract(point, origin);
+  		for (let row = 0; row < 3; row += 1) for (let column = 0; column < 3; column += 1) matrix[row * 3 + column] = (matrix[row * 3 + column] ?? 0) + (d[row] ?? 0) * (d[column] ?? 0);
+  	}
+  	return matrix;
+  }
+  function subtract(point, origin) {
+  	return [
+  		point.x - (origin[0] ?? 0),
+  		point.y - (origin[1] ?? 0),
+  		point.z - (origin[2] ?? 0)
+  	];
+  }
+  function dot$1(left, right) {
+  	return (left[0] ?? 0) * (right[0] ?? 0) + (left[1] ?? 0) * (right[1] ?? 0) + (left[2] ?? 0) * (right[2] ?? 0);
+  }
+  //#endregion
+  //#region src/placement/planar-pose.ts
+  var REFINE_STEPS = 60;
+  /**
+  * How well a point can be placed in the image, in pixels.
+  *
+  * An operator clicking a projected corner, or a detector finding one, lands
+  * within about half a pixel on a good day. It is an assumption and it is stated
+  * as one, rather than being left implicit in a residual that happens to be
+  * small.
+  */
+  var DEFAULT_IMAGE_SIGMA_PX = .5;
+  /**
+  * How far apart two poses must be before they count as different solutions.
+  *
+  * Refining from the reflected start does not always reach a second minimum: for
+  * a target showing plenty of perspective there is none, and the refinement
+  * slides back onto the first. That case has to be told from a genuine second
+  * solution, because both leave the two residuals equal and the ratio alone
+  * cannot say which happened.
+  */
+  var DISTINCT_SOLUTION_DEG = 1;
+  function solvePlanarPose(planar, image, intrinsics, distortion, imageSigmaPx = DEFAULT_IMAGE_SIGMA_PX) {
+  	if (planar.length < 4 || planar.length !== image.length) return void 0;
+  	const homography = homographyFrom(planar, image.map((point) => normalize(point, intrinsics, distortion)));
+  	if (!homography) return void 0;
+  	const initial = poseFromHomography(homography);
+  	if (!initial) return void 0;
+  	const first = refine(initial, planar, image, intrinsics, distortion);
+  	const mirrored = reflectAboutLineOfSight(first, planar);
+  	const second = mirrored ? refine(mirrored, planar, image, intrinsics, distortion) : void 0;
+  	const ordered = second && second.reprojectionRmsPx < first.reprojectionRmsPx ? [second, first] : [first, second];
+  	const best = ordered[0];
+  	const other = ordered[1];
+  	const alternative = other !== void 0 && angleBetweenDeg(best.rotation, other.rotation) > DISTINCT_SOLUTION_DEG ? other : void 0;
+  	const floor = Math.max(best.reprojectionRmsPx, imageSigmaPx);
+  	return {
+  		best,
+  		alternative,
+  		errorRatio: alternative === void 0 ? Number.POSITIVE_INFINITY : Math.max(alternative.reprojectionRmsPx, imageSigmaPx) / floor,
+  		pointCount: planar.length
+  	};
+  }
+  /**
+  * The homography taking plane coordinates to normalised image coordinates.
+  *
+  * Both sets are conditioned first. Without it the rows of the design matrix
+  * differ by the square of the target's size in metres, and the smallest
+  * eigenvector of a matrix with that spread is dominated by rounding rather than
+  * by the measurement.
+  */
+  function homographyFrom(planar, normalized) {
+  	const source = conditionPlanar(planar);
+  	const target = conditionNormalized(normalized);
+  	const rows = [];
+  	for (let index = 0; index < planar.length; index += 1) {
+  		const s = source.points[index];
+  		const t = target.points[index];
+  		rows.push(-s.u, -s.v, -1, 0, 0, 0, t.x * s.u, t.x * s.v, t.x);
+  		rows.push(0, 0, 0, -s.u, -s.v, -1, t.y * s.u, t.y * s.v, t.y);
+  	}
+  	const a = rows;
+  	const count = planar.length * 2;
+  	const { vectors } = symmetricEigen(multiply(transpose(a, count, 9), a, 9, count, 9), 9);
+  	const h = columnOf(vectors, 9, 0);
+  	if (!h.every((value) => Number.isFinite(value))) return void 0;
+  	const undone = multiply(multiply(target.inverse, h, 3, 3, 3), source.matrix, 3, 3, 3);
+  	const scale = undone[8] ?? 0;
+  	if (scale === 0 || !Number.isFinite(scale)) return void 0;
+  	return undone.map((value) => value / scale);
+  }
+  /**
+  * Splits a homography into a rotation and a translation.
+  *
+  * The first two columns are the images of the plane's axes, so they carry the
+  * same scale as the translation; the third rotation column is their cross
+  * product. The result is only approximately orthonormal, so it is squared up
+  * before use and refined afterwards.
+  */
+  function poseFromHomography(homography) {
+  	const h1 = [
+  		homography[0] ?? 0,
+  		homography[3] ?? 0,
+  		homography[6] ?? 0
+  	];
+  	const h2 = [
+  		homography[1] ?? 0,
+  		homography[4] ?? 0,
+  		homography[7] ?? 0
+  	];
+  	const h3 = [
+  		homography[2] ?? 0,
+  		homography[5] ?? 0,
+  		homography[8] ?? 0
+  	];
+  	const norm1 = length(h1);
+  	const norm2 = length(h2);
+  	if (!(norm1 > 0) || !(norm2 > 0)) return void 0;
+  	const scale = 2 / (norm1 + norm2);
+  	let r1 = h1.map((value) => value * scale);
+  	let r2 = h2.map((value) => value * scale);
+  	let t = h3.map((value) => value * scale);
+  	if ((t[2] ?? 0) < 0) {
+  		r1 = r1.map((value) => -value);
+  		r2 = r2.map((value) => -value);
+  		t = t.map((value) => -value);
+  	}
+  	const rotation = orthonormalize(r1, r2);
+  	return rotation ? {
+  		rotation,
+  		translation: t
+  	} : void 0;
+  }
+  /**
+  * The other pose a planar target allows.
+  *
+  * Two board orientations project a plane almost identically: tilted one way
+  * about an axis lying in the image, and tilted the same amount the other way.
+  * The second is built by reflecting the board's normal about the ray through
+  * its centre and turning the board by the smallest rotation that does it, which
+  * leaves the in-plane orientation alone. The board's centre is held where it
+  * was, so the two solutions differ in tilt and not in where the thing is.
+  *
+  * As the tilt goes to zero the reflected normal converges on the original and
+  * the second solution becomes the first. That is not a failure of the
+  * construction but the shape of the problem: a target showing little
+  * perspective does not determine which way it leans.
+  */
+  function reflectAboutLineOfSight(pose, planar) {
+  	const centre = centroidInCamera(pose, planar);
+  	const view = normalizeVector(centre);
+  	if (!view) return void 0;
+  	const normal = [
+  		pose.rotation[2] ?? 0,
+  		pose.rotation[5] ?? 0,
+  		pose.rotation[8] ?? 0
+  	];
+  	const projection = dot(normal, view);
+  	const turn = rotationBetween(normal, normal.map((value, index) => 2 * projection * (view[index] ?? 0) - value));
+  	if (!turn) return void 0;
+  	const rotation = multiply(turn, pose.rotation, 3, 3, 3);
+  	const planarCentre = planarCentroid(planar);
+  	return {
+  		rotation,
+  		translation: [
+  			0,
+  			1,
+  			2
+  		].map((row) => (centre[row] ?? 0) - ((rotation[row * 3] ?? 0) * planarCentre.u + (rotation[row * 3 + 1] ?? 0) * planarCentre.v))
+  	};
+  }
+  /** The smallest rotation taking one unit vector onto another. */
+  function rotationBetween(from, to) {
+  	const a = normalizeVector(from);
+  	const b = normalizeVector(to);
+  	if (!a || !b) return void 0;
+  	const axis = cross(a, b);
+  	const sine = length(axis);
+  	const cosine = Math.min(1, Math.max(-1, dot(a, b)));
+  	if (sine < 1e-12) return cosine > 0 ? [
+  		1,
+  		0,
+  		0,
+  		0,
+  		1,
+  		0,
+  		0,
+  		0,
+  		1
+  	] : void 0;
+  	return rotationMatrix(axis.map((value) => value / sine * Math.atan2(sine, cosine)));
+  }
+  function planarCentroid(planar) {
+  	let u = 0;
+  	let v = 0;
+  	for (const point of planar) {
+  		u += point.u;
+  		v += point.v;
+  	}
+  	return {
+  		u: u / planar.length,
+  		v: v / planar.length
+  	};
+  }
+  /**
+  * Levenberg-Marquardt on the six pose parameters.
+  *
+  * The Jacobian is taken numerically. With six parameters and a handful of
+  * points the cost is nothing, and a hand-written analytic Jacobian is a place
+  * for a sign error to hide where it would look like a slightly worse fit.
+  */
+  function refine(initial, planar, image, intrinsics, distortion) {
+  	let parameters = [...rotationVector(initial.rotation), ...initial.translation];
+  	let lambda = .001;
+  	let current = residualsOf(parameters, planar, image, intrinsics, distortion);
+  	let cost = sumSquares(current);
+  	for (let step = 0; step < REFINE_STEPS; step += 1) {
+  		const jacobian = jacobianOf(parameters, planar, image, intrinsics, distortion);
+  		const jt = transpose(jacobian, current.length, 6);
+  		const jtj = multiply(jt, jacobian, 6, current.length, 6);
+  		const jtr = multiply(jt, current, 6, current.length, 1);
+  		let applied = false;
+  		for (let attempt = 0; attempt < 8; attempt += 1) {
+  			const damped = [...jtj];
+  			for (let index = 0; index < 6; index += 1) damped[index * 6 + index] = (damped[index * 6 + index] ?? 0) * (1 + lambda);
+  			const delta = solveSymmetric(damped, jtr, 6);
+  			if (!delta) {
+  				lambda *= 10;
+  				continue;
+  			}
+  			const candidate = parameters.map((value, index) => value - (delta[index] ?? 0));
+  			const candidateResiduals = residualsOf(candidate, planar, image, intrinsics, distortion);
+  			const candidateCost = sumSquares(candidateResiduals);
+  			if (candidateCost < cost) {
+  				parameters = candidate;
+  				current = candidateResiduals;
+  				cost = candidateCost;
+  				lambda = Math.max(lambda / 10, 1e-12);
+  				applied = true;
+  				break;
+  			}
+  			lambda *= 10;
+  		}
+  		if (!applied) break;
+  	}
+  	const rotation = rotationMatrix(parameters.slice(0, 3));
+  	const translation = parameters.slice(3, 6);
+  	const errors = pointErrors(current);
+  	return {
+  		rotation,
+  		translation,
+  		reprojectionRmsPx: Math.sqrt(cost / Math.max(1, errors.length)),
+  		reprojectionMaxPx: errors.length === 0 ? 0 : Math.max(...errors)
+  	};
+  }
+  /**
+  * How much the marking accuracy of the points could have moved the pose.
+  *
+  * The inverse of JᵀJ scaled by a measurement variance is the usual covariance,
+  * and a flat minimum -- the near square-on view -- turns a small marking error
+  * into a large pose error, which is what this is for.
+  *
+  * The variance is the larger of what the residuals show and what the points
+  * were marked to. Taking only the residuals reports certainty that does not
+  * exist: a solve fitted to points placed by hand can leave almost no residual
+  * and still be a guess, and synthetic points leave none at all.
+  */
+  function poseUncertainty(pose, planar, image, intrinsics, distortion, imageSigmaPx = DEFAULT_IMAGE_SIGMA_PX) {
+  	const parameters = [...rotationVector(pose.rotation), ...pose.translation];
+  	const residuals = residualsOf(parameters, planar, image, intrinsics, distortion);
+  	const degreesOfFreedom = Math.max(1, residuals.length - 6);
+  	const variance = Math.max(sumSquares(residuals) / degreesOfFreedom, imageSigmaPx ** 2);
+  	const jacobian = jacobianOf(parameters, planar, image, intrinsics, distortion);
+  	const { values, vectors } = symmetricEigen(multiply(transpose(jacobian, residuals.length, 6), jacobian, 6, residuals.length, 6), 6);
+  	let rotationVariance = 0;
+  	let translationVariance = 0;
+  	for (let mode = 0; mode < 6; mode += 1) {
+  		const eigenvalue = values[mode] ?? 0;
+  		if (!(eigenvalue > 1e-12)) return {
+  			translationSigmaMeters: Number.POSITIVE_INFINITY,
+  			rotationSigmaDeg: Number.POSITIVE_INFINITY
+  		};
+  		const vector = columnOf(vectors, 6, mode);
+  		const share = variance / eigenvalue;
+  		for (let index = 0; index < 3; index += 1) {
+  			rotationVariance += share * (vector[index] ?? 0) ** 2;
+  			translationVariance += share * (vector[index + 3] ?? 0) ** 2;
+  		}
+  	}
+  	return {
+  		translationSigmaMeters: Math.sqrt(translationVariance),
+  		rotationSigmaDeg: Math.sqrt(rotationVariance) * 180 / Math.PI
+  	};
+  }
+  function rigidFromPose(pose) {
+  	const r = pose.rotation;
+  	const t = pose.translation;
+  	return [
+  		r[0] ?? 0,
+  		r[1] ?? 0,
+  		r[2] ?? 0,
+  		t[0] ?? 0,
+  		r[3] ?? 0,
+  		r[4] ?? 0,
+  		r[5] ?? 0,
+  		t[1] ?? 0,
+  		r[6] ?? 0,
+  		r[7] ?? 0,
+  		r[8] ?? 0,
+  		t[2] ?? 0,
+  		0,
+  		0,
+  		0,
+  		1
+  	];
+  }
+  function residualsOf(parameters, planar, image, intrinsics, distortion) {
+  	const rotation = rotationMatrix(parameters.slice(0, 3));
+  	const translation = parameters.slice(3, 6);
+  	const residuals = [];
+  	for (let index = 0; index < planar.length; index += 1) {
+  		const point = planar[index];
+  		const observed = image[index];
+  		const camera = [
+  			(rotation[0] ?? 0) * point.u + (rotation[1] ?? 0) * point.v + (translation[0] ?? 0),
+  			(rotation[3] ?? 0) * point.u + (rotation[4] ?? 0) * point.v + (translation[1] ?? 0),
+  			(rotation[6] ?? 0) * point.u + (rotation[7] ?? 0) * point.v + (translation[2] ?? 0)
+  		];
+  		const z = camera[2] ?? 0;
+  		if (!(Math.abs(z) > 1e-9)) {
+  			residuals.push(1e6, 1e6);
+  			continue;
+  		}
+  		const projected = project({
+  			x: (camera[0] ?? 0) / z,
+  			y: (camera[1] ?? 0) / z
+  		}, intrinsics, distortion);
+  		residuals.push(projected.u - observed.u, projected.v - observed.v);
+  	}
+  	return residuals;
+  }
+  function jacobianOf(parameters, planar, image, intrinsics, distortion) {
+  	const rows = planar.length * 2;
+  	const jacobian = new Array(rows * 6).fill(0);
+  	for (let column = 0; column < 6; column += 1) {
+  		const step = column < 3 ? 1e-7 : 1e-7 * Math.max(1, Math.abs(parameters[column] ?? 0));
+  		const forward = [...parameters];
+  		const backward = [...parameters];
+  		forward[column] = (forward[column] ?? 0) + step;
+  		backward[column] = (backward[column] ?? 0) - step;
+  		const plus = residualsOf(forward, planar, image, intrinsics, distortion);
+  		const minus = residualsOf(backward, planar, image, intrinsics, distortion);
+  		for (let row = 0; row < rows; row += 1) jacobian[row * 6 + column] = ((plus[row] ?? 0) - (minus[row] ?? 0)) / (2 * step);
+  	}
+  	return jacobian;
+  }
+  function pointErrors(residuals) {
+  	const errors = [];
+  	for (let index = 0; index < residuals.length; index += 2) errors.push(Math.hypot(residuals[index] ?? 0, residuals[index + 1] ?? 0));
+  	return errors;
+  }
+  function sumSquares(values) {
+  	return values.reduce((total, value) => total + value * value, 0);
+  }
+  /** The angle of the rotation taking one orientation onto the other. */
+  function angleBetweenDeg(left, right) {
+  	let trace = 0;
+  	for (let index = 0; index < 3; index += 1) for (let k = 0; k < 3; k += 1) if (index === 0) trace += 0;
+  	trace = 0;
+  	for (let index = 0; index < 3; index += 1) {
+  		let total = 0;
+  		for (let k = 0; k < 3; k += 1) total += (left[k * 3 + index] ?? 0) * (right[k * 3 + index] ?? 0);
+  		trace += total;
+  	}
+  	const cosine = Math.min(1, Math.max(-1, (trace - 1) / 2));
+  	return Math.acos(cosine) * 180 / Math.PI;
+  }
+  function centroidInCamera(pose, planar) {
+  	let u = 0;
+  	let v = 0;
+  	for (const point of planar) {
+  		u += point.u;
+  		v += point.v;
+  	}
+  	u /= planar.length;
+  	v /= planar.length;
+  	const r = pose.rotation;
+  	const t = pose.translation;
+  	return [
+  		(r[0] ?? 0) * u + (r[1] ?? 0) * v + (t[0] ?? 0),
+  		(r[3] ?? 0) * u + (r[4] ?? 0) * v + (t[1] ?? 0),
+  		(r[6] ?? 0) * u + (r[7] ?? 0) * v + (t[2] ?? 0)
+  	];
+  }
+  function orthonormalize(r1, r2) {
+  	const a = normalizeVector(r1);
+  	if (!a) return void 0;
+  	const projection = dot(r2, a);
+  	const b = normalizeVector(r2.map((value, index) => value - projection * (a[index] ?? 0)));
+  	if (!b) return void 0;
+  	const c = cross(a, b);
+  	return [
+  		a[0] ?? 0,
+  		b[0] ?? 0,
+  		c[0] ?? 0,
+  		a[1] ?? 0,
+  		b[1] ?? 0,
+  		c[1] ?? 0,
+  		a[2] ?? 0,
+  		b[2] ?? 0,
+  		c[2] ?? 0
+  	];
+  }
+  function rotationVector(rotation) {
+  	const trace = (rotation[0] ?? 0) + (rotation[4] ?? 0) + (rotation[8] ?? 0);
+  	const cosine = Math.min(1, Math.max(-1, (trace - 1) / 2));
+  	const angle = Math.acos(cosine);
+  	if (angle < 1e-9) return [
+  		0,
+  		0,
+  		0
+  	];
+  	const sine = Math.sin(angle);
+  	if (Math.abs(sine) < 1e-9) return [
+  		Math.sqrt(Math.max(0, ((rotation[0] ?? 0) + 1) / 2)),
+  		Math.sqrt(Math.max(0, ((rotation[4] ?? 0) + 1) / 2)),
+  		Math.sqrt(Math.max(0, ((rotation[8] ?? 0) + 1) / 2))
+  	].map((value) => value * angle);
+  	const factor = angle / (2 * sine);
+  	return [
+  		((rotation[7] ?? 0) - (rotation[5] ?? 0)) * factor,
+  		((rotation[2] ?? 0) - (rotation[6] ?? 0)) * factor,
+  		((rotation[3] ?? 0) - (rotation[1] ?? 0)) * factor
+  	];
+  }
+  function rotationMatrix(vector) {
+  	const angle = length(vector);
+  	if (angle < 1e-12) return [
+  		1,
+  		0,
+  		0,
+  		0,
+  		1,
+  		0,
+  		0,
+  		0,
+  		1
+  	];
+  	const axis = vector.map((value) => value / angle);
+  	const c = Math.cos(angle);
+  	const s = Math.sin(angle);
+  	const t = 1 - c;
+  	const [x, y, z] = [
+  		axis[0] ?? 0,
+  		axis[1] ?? 0,
+  		axis[2] ?? 0
+  	];
+  	return [
+  		t * x * x + c,
+  		t * x * y - s * z,
+  		t * x * z + s * y,
+  		t * x * y + s * z,
+  		t * y * y + c,
+  		t * y * z - s * x,
+  		t * x * z - s * y,
+  		t * y * z + s * x,
+  		t * z * z + c
+  	];
+  }
+  function conditionPlanar(points) {
+  	let cu = 0;
+  	let cv = 0;
+  	for (const point of points) {
+  		cu += point.u;
+  		cv += point.v;
+  	}
+  	cu /= points.length;
+  	cv /= points.length;
+  	let spread = 0;
+  	for (const point of points) spread += Math.hypot(point.u - cu, point.v - cv);
+  	const scale = spread > 0 ? points.length * Math.SQRT2 / spread : 1;
+  	return {
+  		points: points.map((point) => ({
+  			u: (point.u - cu) * scale,
+  			v: (point.v - cv) * scale
+  		})),
+  		matrix: [
+  			scale,
+  			0,
+  			-scale * cu,
+  			0,
+  			scale,
+  			-scale * cv,
+  			0,
+  			0,
+  			1
+  		]
+  	};
+  }
+  function conditionNormalized(points) {
+  	let cx = 0;
+  	let cy = 0;
+  	for (const point of points) {
+  		cx += point.x;
+  		cy += point.y;
+  	}
+  	cx /= points.length;
+  	cy /= points.length;
+  	let spread = 0;
+  	for (const point of points) spread += Math.hypot(point.x - cx, point.y - cy);
+  	const scale = spread > 0 ? points.length * Math.SQRT2 / spread : 1;
+  	return {
+  		points: points.map((point) => ({
+  			x: (point.x - cx) * scale,
+  			y: (point.y - cy) * scale
+  		})),
+  		inverse: [
+  			1 / scale,
+  			0,
+  			cx,
+  			0,
+  			1 / scale,
+  			cy,
+  			0,
+  			0,
+  			1
+  		]
+  	};
+  }
+  function normalizeVector(vector) {
+  	const norm = length(vector);
+  	return norm > 0 ? vector.map((value) => value / norm) : void 0;
+  }
+  function cross(a, b) {
+  	return [
+  		(a[1] ?? 0) * (b[2] ?? 0) - (a[2] ?? 0) * (b[1] ?? 0),
+  		(a[2] ?? 0) * (b[0] ?? 0) - (a[0] ?? 0) * (b[2] ?? 0),
+  		(a[0] ?? 0) * (b[1] ?? 0) - (a[1] ?? 0) * (b[0] ?? 0)
+  	];
+  }
+  function dot(a, b) {
+  	return (a[0] ?? 0) * (b[0] ?? 0) + (a[1] ?? 0) * (b[1] ?? 0) + (a[2] ?? 0) * (b[2] ?? 0);
+  }
+  function length(vector) {
+  	return Math.sqrt(dot(vector, vector));
+  }
+  //#endregion
+  //#region src/placement/solve.ts
+  var DEFAULT_MINIMUM_ERROR_RATIO = 2;
+  /**
+  * Places every camera that saw the reference, and the cameras against each other.
+  *
+  * A pose is refused when the two planar solutions fit within a factor of each
+  * other, however small the residual is. A residual says the pose explains the
+  * image; it does not say the image picked that pose out of the alternatives,
+  * and for a target showing little perspective it does not.
+  */
+  function solvePlacement(options) {
+  	const planar = toPlanarReference(options.reference);
+  	if (!planar.ok) return {
+  		ok: false,
+  		code: "reference-unknown",
+  		message: planar.message
+  	};
+  	const reference = planar.reference;
+  	const byId = new Map(reference.ids.map((id, index) => [id, index]));
+  	const minimumRatio = options.minimumErrorRatio ?? DEFAULT_MINIMUM_ERROR_RATIO;
+  	const cameras = [];
+  	const poses = /* @__PURE__ */ new Map();
+  	const notes = [];
+  	let degraded = false;
+  	for (const observation of options.observations) {
+  		if (observation.referenceId !== reference.referenceId) return {
+  			ok: false,
+  			code: "reference-unknown",
+  			message: `Camera ${observation.cameraId} observed ${observation.referenceId}, not ${reference.referenceId}.`
+  		};
+  		const model = options.models[observation.cameraId];
+  		if (!model) return {
+  			ok: false,
+  			code: "intrinsic-profile-mismatch",
+  			message: `No camera model was supplied for ${observation.cameraId}.`
+  		};
+  		requireSupportedDistortion(model.distortion);
+  		const paired = pairPoints(observation, byId, reference);
+  		if (!paired) return {
+  			ok: false,
+  			code: "insufficient-points",
+  			message: `Camera ${observation.cameraId} did not mark at least four of the reference points.`
+  		};
+  		const solution = solvePlanarPose(paired.planar, paired.image, model.intrinsics, model.distortion, options.imageSigmaPx);
+  		if (!solution) return {
+  			ok: false,
+  			code: "degenerate-view",
+  			message: `Camera ${observation.cameraId} produced no pose: its marks may be collinear.`
+  		};
+  		if (solution.errorRatio < minimumRatio) return {
+  			ok: false,
+  			code: "degenerate-view",
+  			message: `Camera ${observation.cameraId} fits two poses about equally well (${solution.errorRatio.toFixed(2)}x apart), so the measurement does not choose between them. Tilt the reference or bring it closer.`
+  		};
+  		const sigma = poseUncertainty(solution.best, paired.planar, paired.image, model.intrinsics, model.distortion, options.imageSigmaPx);
+  		const scaleShare = reference.extentMeters > 0 ? reference.sigmaMeters / reference.extentMeters * Math.hypot(...solution.best.translation) : 0;
+  		const cameraFromReference = rigidFromPose(solution.best);
+  		poses.set(observation.cameraId, cameraFromReference);
+  		cameras.push({
+  			cameraId: observation.cameraId,
+  			cameraFromReference,
+  			reprojectionRmsPx: round(solution.best.reprojectionRmsPx),
+  			reprojectionMaxPx: round(solution.best.reprojectionMaxPx),
+  			pointCount: paired.planar.length,
+  			ippeErrorRatio: Number.isFinite(solution.errorRatio) ? round(solution.errorRatio) : 1e6,
+  			translationSigmaMeters: round(Math.hypot(sigma.translationSigmaMeters, scaleShare)),
+  			rotationSigmaDeg: round(sigma.rotationSigmaDeg)
+  		});
+  	}
+  	if (cameras.length === 0) return {
+  		ok: false,
+  		code: "insufficient-points",
+  		message: "No camera observed the reference."
+  	};
+  	if (reference.planarityResidualMeters > reference.sigmaMeters * 5) {
+  		degraded = true;
+  		notes.push(`The reference points sit up to ${reference.planarityResidualMeters.toFixed(4)} m off their best plane, which is beyond how well they were measured.`);
+  	}
+  	const pairs = [];
+  	const ids = [...poses.keys()];
+  	for (let i = 0; i < ids.length; i += 1) for (let j = i + 1; j < ids.length; j += 1) {
+  		const from = ids[i];
+  		const to = ids[j];
+  		const fromPose = poses.get(from);
+  		const toPose = poses.get(to);
+  		const toFromFrom = composeRigidTransforms(toPose, invertRigidTransform(fromPose));
+  		const baseline = baselineMeters(fromPose, toPose);
+  		const sigmaFrom = cameras.find((entry) => entry.cameraId === from)?.translationSigmaMeters ?? 0;
+  		const sigmaTo = cameras.find((entry) => entry.cameraId === to)?.translationSigmaMeters ?? 0;
+  		pairs.push({
+  			from,
+  			to,
+  			toFromFrom: toFromFrom.map(round),
+  			baselineMeters: round(baseline),
+  			baselineSigmaMeters: round(Math.hypot(sigmaFrom, sigmaTo))
+  		});
+  	}
+  	const verification = [];
+  	for (const check of options.verification ?? []) {
+  		const fromPose = poses.get(check.a);
+  		const toPose = poses.get(check.b);
+  		if (!fromPose || !toPose) return {
+  			ok: false,
+  			code: "verification-failed",
+  			message: `The distance check names ${check.a} and ${check.b}, and one of them has no placement.`
+  		};
+  		const measured = baselineMeters(fromPose, toPose);
+  		verification.push({
+  			kind: "distance",
+  			a: check.a,
+  			b: check.b,
+  			expectedMeters: check.expectedMeters,
+  			measuredMeters: round(measured),
+  			residualMeters: round(measured - check.expectedMeters)
+  		});
+  	}
+  	return {
+  		ok: true,
+  		result: {
+  			schema: PLACEMENT_RESULT_SCHEMA,
+  			version: 1,
+  			referenceId: reference.referenceId,
+  			rigId: options.rigId,
+  			cameras,
+  			pairs,
+  			verification,
+  			degraded,
+  			notes
+  		}
+  	};
+  }
+  /**
+  * Matches marked image points to measured reference points by name.
+  *
+  * Only the points both sides name are used. A mark whose name is not in the
+  * reference is dropped rather than matched by position: matching by order is
+  * how a mislabelled corner becomes a rotated placement that still reprojects
+  * neatly.
+  */
+  function pairPoints(observation, byId, reference) {
+  	const planar = [];
+  	const image = [];
+  	for (const mark of observation.imagePoints) {
+  		const index = byId.get(mark.id);
+  		if (index === void 0) continue;
+  		const point = reference.planar[index];
+  		if (!point) continue;
+  		planar.push({
+  			u: point.u,
+  			v: point.v
+  		});
+  		image.push({
+  			u: mark.u,
+  			v: mark.v
+  		});
+  	}
+  	return planar.length >= 4 ? {
+  		planar,
+  		image
+  	} : void 0;
+  }
+  function round(value) {
+  	return Number.isFinite(value) ? Number(value.toFixed(9)) : 0;
+  }
+  //#endregion
   //#region src/runtime-capability.ts
   var runtimeCapabilityKey = "kubohiroyaTimeSpaceSyncCapability";
   function createRuntimeCapability(host) {
@@ -2356,6 +3790,9 @@
   var TimeSpaceSyncExtension = class {
   	constructor(options = {}) {
   		this.correspondenceError = "";
+  		this.placementObservations = [];
+  		this.cameraModels = /* @__PURE__ */ new Map();
+  		this.placementErrorCode = "";
   		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
   		this.opticalTimeEnabled = options.opticalTimeEnabled ?? featureFlags.opticalTimeSyncV1;
   		this.placementEnabled = options.placementEnabled ?? featureFlags.placementSolveV1;
@@ -2488,6 +3925,87 @@
   	opticalTimeMinimumCalibrationSeconds() {
   		return this.requireController().minimumCalibrationSeconds();
   	}
+  	defineReference(args) {
+  		this.requirePlacement();
+  		const parsed = parseReferenceDefinition(readJson(args.REFERENCE_JSON));
+  		if (!parsed.ok) {
+  			this.placementErrorCode = "invalid-payload";
+  			return;
+  		}
+  		this.reference = parsed.value;
+  		this.placementErrorCode = "";
+  	}
+  	addPlacementObservation(args) {
+  		this.requirePlacement();
+  		const parsed = parsePlacementObservation(readJson(args.OBSERVATION_JSON));
+  		if (!parsed.ok) {
+  			this.placementErrorCode = "invalid-payload";
+  			return;
+  		}
+  		const index = this.placementObservations.findIndex((entry) => entry.cameraId === parsed.value.cameraId);
+  		if (index >= 0) this.placementObservations.splice(index, 1);
+  		this.placementObservations.push(parsed.value);
+  		this.placementErrorCode = "";
+  	}
+  	setCameraModel(args) {
+  		this.requirePlacement();
+  		const cameraId = Scratch.Cast.toString(args.CAMERA_ID).trim();
+  		const model = readJson(args.MODEL_JSON);
+  		if (!cameraId || !model || typeof model.intrinsics !== "object") {
+  			this.placementErrorCode = "invalid-payload";
+  			return;
+  		}
+  		this.cameraModels.set(cameraId, model);
+  		this.placementErrorCode = "";
+  	}
+  	solvePlacement(args) {
+  		this.requirePlacement();
+  		const reference = this.reference;
+  		if (!reference) {
+  			this.placementErrorCode = "reference-unknown";
+  			return;
+  		}
+  		let result;
+  		try {
+  			result = solvePlacement({
+  				reference,
+  				observations: this.placementObservations,
+  				models: Object.fromEntries(this.cameraModels),
+  				rigId: Scratch.Cast.toString(args.RIG_ID)
+  			});
+  		} catch (error) {
+  			this.placement = void 0;
+  			this.placementErrorCode = errorCodeOf(error);
+  			return;
+  		}
+  		if (result.ok) {
+  			this.placement = result.result;
+  			this.placementErrorCode = "";
+  			return;
+  		}
+  		this.placement = void 0;
+  		this.placementErrorCode = result.code;
+  	}
+  	placementResultJson() {
+  		return this.placement ? JSON.stringify(this.placement) : "";
+  	}
+  	placementError() {
+  		return this.placementErrorCode;
+  	}
+  	placementReprojectionRms(args) {
+  		const cameraId = Scratch.Cast.toString(args.CAMERA_ID);
+  		return this.placement?.cameras.find((camera) => camera.cameraId === cameraId)?.reprojectionRmsPx ?? 0;
+  	}
+  	clearPlacement() {
+  		this.reference = void 0;
+  		this.placementObservations.length = 0;
+  		this.cameraModels.clear();
+  		this.placement = void 0;
+  		this.placementErrorCode = "";
+  	}
+  	requirePlacement() {
+  		if (!this.placementEnabled) throw new TimeSpaceSyncError("invalid-payload", "Placement solve v1 is disabled. Enable it before the project starts.");
+  	}
   	/**
   	* How well the display's refresh interval is known.
   	*
@@ -2568,6 +4086,7 @@
   			this.observation = void 0;
   			this.correspondence = void 0;
   			this.correspondenceError = "";
+  			this.clearPlacement();
   			this.acknowledgement = void 0;
   		};
   		for (const event of [
@@ -2588,6 +4107,14 @@
   		};
   	}
   };
+  /** Parses block text as JSON, treating anything unparseable as absent. */
+  function readJson(value) {
+  	try {
+  		return JSON.parse(Scratch.Cast.toString(value));
+  	} catch {
+  		return;
+  	}
+  }
   //#endregion
   //#region src/index.ts
   if (extensionConfig.unsandboxed && !Scratch.extensions.unsandboxed) throw new Error(`${extensionConfig.name} must run unsandboxed.`);
