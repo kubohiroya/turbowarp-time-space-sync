@@ -1,0 +1,37 @@
+{
+  "schema": "twtss/optical-time-observation",
+  "version": 1,
+  "cameraId": "camera-left",
+  "referenceId": "wall-projection",
+  "patternProfileId": "twtss.pattern.v1",
+  "observerDomain": {
+    "id": "local:9f1c5a2e",
+    "kind": "local-monotonic",
+    "epoch": 0,
+    "uncertaintyUs": 0
+  },
+  "displayDomain": {
+    "id": "local:9f1c5a2e",
+    "kind": "local-monotonic",
+    "epoch": 0,
+    "uncertaintyUs": 0
+  },
+  "deliveredAtUs": 1737000000000000,
+  "monotonicAtUs": 421337000,
+  "captureTimeUs": 1736999999982000,
+  "captureTimeKind": "capture",
+  "patternCodeTimestampUs": 1234000,
+  "wrapUs": 4096000,
+  "stepUs": 1000,
+  "displayRefreshUs": 16667,
+  "refreshUncertaintyUs": 120,
+  "constraintLoUs": 1736999999975000,
+  "constraintHiUs": 1736999999995000,
+  "decodeMargin": 41.5,
+  "panel": {"x": 68, "y": 32, "width": 96, "height": 96},
+  "imageWidth": 240,
+  "imageHeight": 180,
+  "captureConditions": {"frameRate": 30, "width": 1280, "height": 720, "exposureTimeUs": 8000},
+  "intrinsicProfileId": "cal-2026-09-15-left",
+  "sequence": 512
+}

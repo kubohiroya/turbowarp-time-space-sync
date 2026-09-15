@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kubohiroya/turbowarp-time-space-sync/main/schemas/placement-result-v1.schema.json",
+  "title": "Placement result, version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "referenceId",
+    "rigId",
+    "cameras",
+    "pairs",
+    "verification",
+    "degraded",
+    "notes"
+  ],
+  "properties": {
+    "schema": {
+      "const": "twtss/placement-result"
+    },
+    "version": {
+      "const": 1
+    },
+    "referenceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "rigId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "cameras": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cameraId",
+          "cameraFromReference",
+          "reprojectionRmsPx",
+          "reprojectionMaxPx",
+          "pointCount",
+          "ippeErrorRatio",
+          "translationSigmaMeters",
+          "rotationSigmaDeg"
+        ],
+        "properties": {
+          "cameraId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "cameraFromReference": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 16,
+            "maxItems": 16
+          },
+          "reprojectionRmsPx": {
+            "type": "number",
+            "minimum": 0
+          },
+          "reprojectionMaxPx": {
+            "type": "number",
+            "minimum": 0
+          },
+          "pointCount": {
+            "type": "integer",
+            "minimum": 4
+          },
+          "ippeErrorRatio": {
+            "type": "number",
+            "minimum": 0
+          },
+          "translationSigmaMeters": {
+            "type": "number",
+            "minimum": 0
+          },
+          "rotationSigmaDeg": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 64
+    },
+    "pairs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to",
+          "toFromFrom",
+          "baselineMeters",
+          "baselineSigmaMeters"
+        ],
+        "properties": {
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "toFromFrom": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 16,
+            "maxItems": 16
+          },
+          "baselineMeters": {
+            "type": "number",
+            "minimum": 0
+          },
+          "baselineSigmaMeters": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "maxItems": 2048
+    },
+    "verification": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "a",
+          "b",
+          "expectedMeters",
+          "measuredMeters",
+          "residualMeters"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "distance"
+            ]
+          },
+          "a": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "b": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "expectedMeters": {
+            "type": "number",
+            "minimum": 0
+          },
+          "measuredMeters": {
+            "type": "number",
+            "minimum": 0
+          },
+          "residualMeters": {
+            "type": "number"
+          }
+        }
+      },
+      "maxItems": 64
+    },
+    "degraded": {
+      "type": "boolean"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 1024
+      },
+      "maxItems": 32
+    }
+  }
+}

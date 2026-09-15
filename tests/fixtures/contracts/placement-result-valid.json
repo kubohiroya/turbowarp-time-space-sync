@@ -1,0 +1,103 @@
+{
+  "schema": "twtss/placement-result",
+  "version": 1,
+  "referenceId": "wall-projection",
+  "rigId": "studio-rig",
+  "cameras": [
+    {
+      "cameraId": "camera-left",
+      "cameraFromReference": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        3,
+        0,
+        0,
+        0,
+        1
+      ],
+      "reprojectionRmsPx": 0.41,
+      "reprojectionMaxPx": 0.98,
+      "pointCount": 4,
+      "ippeErrorRatio": 6.8,
+      "translationSigmaMeters": 0.004,
+      "rotationSigmaDeg": 0.21
+    },
+    {
+      "cameraId": "camera-right",
+      "cameraFromReference": [
+        0.882947592859,
+        0,
+        -0.469471562786,
+        0.15,
+        0,
+        1,
+        0,
+        0,
+        0.469471562786,
+        0,
+        0.882947592859,
+        3.2,
+        0,
+        0,
+        0,
+        1
+      ],
+      "reprojectionRmsPx": 0.52,
+      "reprojectionMaxPx": 1.21,
+      "pointCount": 4,
+      "ippeErrorRatio": 5.1,
+      "translationSigmaMeters": 0.005,
+      "rotationSigmaDeg": 0.27
+    }
+  ],
+  "pairs": [
+    {
+      "from": "camera-left",
+      "to": "camera-right",
+      "toFromFrom": [
+        0.882947592859,
+        0,
+        -0.469471562786,
+        1.558414688358,
+        0,
+        1,
+        0,
+        0,
+        0.469471562786,
+        0,
+        0.882947592859,
+        0.551157221423,
+        0,
+        0,
+        0,
+        1
+      ],
+      "baselineMeters": 1.653007,
+      "baselineSigmaMeters": 0.006
+    }
+  ],
+  "verification": [
+    {
+      "kind": "distance",
+      "a": "camera-left",
+      "b": "camera-right",
+      "expectedMeters": 1.651,
+      "measuredMeters": 1.653007,
+      "residualMeters": 0.002007
+    }
+  ],
+  "degraded": false,
+  "notes": [
+    "cameraFromReference maps reference points into the camera frame; see rigid-transform.ts.",
+    "The independent distance check is a tape measurement between the camera bodies."
+  ]
+}

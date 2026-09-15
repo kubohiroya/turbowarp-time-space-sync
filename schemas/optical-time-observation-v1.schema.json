@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kubohiroya/turbowarp-time-space-sync/main/schemas/optical-time-observation-v1.schema.json",
+  "title": "Optical time observation, version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "cameraId",
+    "referenceId",
+    "patternProfileId",
+    "observerDomain",
+    "displayDomain",
+    "deliveredAtUs",
+    "monotonicAtUs",
+    "captureTimeKind",
+    "patternCodeTimestampUs",
+    "wrapUs",
+    "stepUs",
+    "displayRefreshUs",
+    "refreshUncertaintyUs",
+    "constraintLoUs",
+    "constraintHiUs",
+    "decodeMargin",
+    "panel",
+    "imageWidth",
+    "imageHeight",
+    "captureConditions",
+    "sequence"
+  ],
+  "properties": {
+    "schema": {
+      "const": "twtss/optical-time-observation"
+    },
+    "version": {
+      "const": 1
+    },
+    "cameraId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "referenceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "patternProfileId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "observerDomain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "epoch",
+        "uncertaintyUs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "local-monotonic",
+            "webrtc-synchronized"
+          ]
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncertaintyUs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "displayDomain": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "epoch",
+            "uncertaintyUs"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "local-monotonic",
+                "webrtc-synchronized"
+              ]
+            },
+            "epoch": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "uncertaintyUs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deliveredAtUs": {
+      "type": "integer"
+    },
+    "monotonicAtUs": {
+      "type": "integer"
+    },
+    "captureTimeUs": {
+      "type": "integer"
+    },
+    "captureTimeKind": {
+      "type": "string",
+      "enum": [
+        "capture",
+        "presentation",
+        "none"
+      ]
+    },
+    "patternCodeTimestampUs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wrapUs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "stepUs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "displayRefreshUs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "refreshUncertaintyUs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "constraintLoUs": {
+      "type": "integer"
+    },
+    "constraintHiUs": {
+      "type": "integer"
+    },
+    "decodeMargin": {
+      "type": "number",
+      "minimum": 0
+    },
+    "panel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "number",
+          "minimum": 0
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "imageWidth": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "imageHeight": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "captureConditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "frameRate": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "exposureTimeUs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "intrinsicProfileId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

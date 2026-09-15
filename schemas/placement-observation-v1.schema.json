@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/kubohiroya/turbowarp-time-space-sync/main/schemas/placement-observation-v1.schema.json",
+  "title": "Placement observation, version 1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "cameraId",
+    "referenceId",
+    "intrinsicProfileId",
+    "imagePoints",
+    "imageWidth",
+    "imageHeight",
+    "capturedAtUs",
+    "conditions"
+  ],
+  "properties": {
+    "schema": {
+      "const": "twtss/placement-observation"
+    },
+    "version": {
+      "const": 1
+    },
+    "cameraId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "referenceId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "intrinsicProfileId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "imagePoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "u",
+          "v"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "u": {
+            "type": "number",
+            "minimum": 0
+          },
+          "v": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "minItems": 4,
+      "maxItems": 1024
+    },
+    "imageWidth": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "imageHeight": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capturedAtUs": {
+      "type": "integer"
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "frameRate": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "exposureTimeUs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
