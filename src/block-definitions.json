@@ -2,13 +2,202 @@
   "extensionName": "TurboWarp-Time-Space-Sync",
   "blocks": [
     {
-      "opcode": "hello",
+      "opcode": "acknowledgePatternFlashing",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "COMMAND",
+      "text": "acknowledge that the time pattern flashes",
+      "description": "Records that the operator was warned the full screen pattern flashes. The pattern will not be shown until this runs, and the acknowledgement lasts until the project stops.",
+      "arguments": {}
+    },
+    {
+      "opcode": "showTimePattern",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "COMMAND",
+      "text": "show time pattern",
+      "description": "Covers the screen with the time coded pattern. The panel stays blank until the display refresh interval has been measured, so nothing decodable is shown from a guess.",
+      "arguments": {}
+    },
+    {
+      "opcode": "hideTimePattern",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "COMMAND",
+      "text": "hide time pattern",
+      "description": "Removes the time pattern overlay. Escape also removes it, and so does the page ceasing to be shown.",
+      "arguments": {}
+    },
+    {
+      "opcode": "timePatternShown",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "BOOLEAN",
+      "text": "time pattern shown?",
+      "description": "Reports whether the time pattern overlay is on screen.",
+      "arguments": {}
+    },
+    {
+      "opcode": "timePatternStable",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "BOOLEAN",
+      "text": "time pattern stable?",
+      "description": "Reports whether the display refresh interval has been measured. While false the panel is blank and no camera can read a time from it.",
+      "arguments": {}
+    },
+    {
+      "opcode": "timePatternRefreshUs",
+      "feature": "opticalTimeSyncV1",
       "blockType": "REPORTER",
-      "text": "hello [NAME]",
-      "description": "Returns a localized greeting for the supplied name.",
+      "text": "time pattern refresh us",
+      "description": "Returns the measured display refresh interval in microseconds, or 0 before it has been measured.",
+      "arguments": {}
+    },
+    {
+      "opcode": "timePatternWrapUs",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "time pattern wrap us",
+      "description": "Returns the period after which the encoded display time repeats, in microseconds.",
+      "arguments": {}
+    },
+    {
+      "opcode": "timePatternProfileId",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "time pattern profile id",
+      "description": "Returns the identifier of the pattern profile in use. The decoder must be given the same profile or no reading will ever decode.",
+      "arguments": {}
+    },
+    {
+      "opcode": "startOpticalTimeDecoder",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "COMMAND",
+      "text": "start optical time decoder for camera [CAMERA_ID] reference [REFERENCE_ID] calibrating [SECONDS] seconds at [REFRESH_US] us refresh",
+      "description": "Leases the camera, locates the pattern, learns each cell light and dark level, and refuses when readings do not decode often enough. The display refresh interval must be supplied because it sets how long each code stays on screen.",
       "arguments": {
-        "NAME": {"type": "STRING", "defaultValue": "world"}
+        "CAMERA_ID": {
+          "type": "STRING",
+          "defaultValue": "default"
+        },
+        "REFERENCE_ID": {
+          "type": "STRING",
+          "defaultValue": "screen"
+        },
+        "SECONDS": {
+          "type": "NUMBER",
+          "defaultValue": 8
+        },
+        "REFRESH_US": {
+          "type": "NUMBER",
+          "defaultValue": 16667
+        }
       }
+    },
+    {
+      "opcode": "calibrateOpticalTimeDecoder",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "COMMAND",
+      "text": "calibrate optical time decoder for [SECONDS] seconds",
+      "description": "Runs calibration again on a running decoder, for example after the camera or the display moved.",
+      "arguments": {
+        "SECONDS": {
+          "type": "NUMBER",
+          "defaultValue": 8
+        }
+      }
+    },
+    {
+      "opcode": "stopOpticalTimeDecoder",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "COMMAND",
+      "text": "stop optical time decoder",
+      "description": "Stops decoding and releases the camera lease.",
+      "arguments": {}
+    },
+    {
+      "opcode": "opticalTimeDecoderState",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "optical time decoder state",
+      "description": "Returns idle, acquiring-camera, calibrating, ready, or error.",
+      "arguments": {}
+    },
+    {
+      "opcode": "opticalTimeDecoderError",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "optical time decoder error",
+      "description": "Returns the last decoder error code, or an empty string when there is none.",
+      "arguments": {}
+    },
+    {
+      "opcode": "opticalTimeDecodeRate",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "optical time decode rate",
+      "description": "Returns the share of recent camera frames the decoder could read, between 0 and 1. It is governed by the camera exposure: a reading only decodes when the whole exposure falls inside one displayed code.",
+      "arguments": {}
+    },
+    {
+      "opcode": "opticalTimeDecodeMargin",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "optical time decode margin",
+      "description": "Returns how much room the weakest cell of the last reading had to spare, in luminance units. A panel drifting out of readability shows here as a falling margin before it starts failing.",
+      "arguments": {}
+    },
+    {
+      "opcode": "opticalTimeObservationAvailable",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "BOOLEAN",
+      "text": "optical time observation available?",
+      "description": "Reports whether a decoded observation is waiting to be taken.",
+      "arguments": {}
+    },
+    {
+      "opcode": "opticalTimeObservationCount",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "optical time observation count",
+      "description": "Returns how many observations are currently held. Observations are kept for a fixed stretch of time rather than a fixed count, so the window does not change length with the decode rate.",
+      "arguments": {}
+    },
+    {
+      "opcode": "opticalTimeDroppedCount",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "optical time dropped count",
+      "description": "Returns how many observations were discarded for leaving the retention window or exceeding the memory cap.",
+      "arguments": {}
+    },
+    {
+      "opcode": "opticalTimeRejectedCount",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "optical time rejected count",
+      "description": "Returns how many readings decoded but could not follow the previous one in real time. A frozen panel and a reading that slipped past the check bits both land here.",
+      "arguments": {}
+    },
+    {
+      "opcode": "takeOpticalTimeObservation",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "COMMAND",
+      "text": "take next optical time observation",
+      "description": "Removes the oldest observation from the queue and exposes it to the observation reporter.",
+      "arguments": {}
+    },
+    {
+      "opcode": "latestOpticalTimeObservationJson",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "latest optical time observation JSON",
+      "description": "Returns the taken observation as twtss/optical-time-observation version 1 JSON, or an empty string before one is taken.",
+      "arguments": {}
+    },
+    {
+      "opcode": "opticalTimeMinimumCalibrationSeconds",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "optical time minimum calibration seconds",
+      "description": "Returns the shortest calibration window in which every pattern cell is guaranteed to change state at least once.",
+      "arguments": {}
     }
   ]
 }
