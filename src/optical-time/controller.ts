@@ -1,4 +1,4 @@
-import type {CameraLeasePort} from '../camera/camera-source.js';
+import type {CameraLease} from '../camera/camera-source.js';
 import {readCaptureConditions, requireCameraSource} from '../camera/camera-source.js';
 import type {SessionClock} from '../clock/index.js';
 import {
@@ -55,7 +55,7 @@ export interface OpticalTimeControllerOptions {
   readonly runtime: TurboWarpRuntime;
   readonly clock: SessionClock;
   readonly profile: PatternProfile;
-  readonly createFramePump: (lease: CameraLeasePort) => FramePumpPort;
+  readonly createFramePump: (lease: CameraLease) => FramePumpPort;
   readonly wait?: (milliseconds: number) => Promise<void>;
   readonly analysisWidth?: number;
   readonly analysisHeight?: number;
@@ -117,7 +117,7 @@ export class OpticalTimeController {
   private readonly runtime: TurboWarpRuntime;
   private readonly clock: SessionClock;
   private readonly profile: PatternProfile;
-  private readonly createFramePump: (lease: CameraLeasePort) => FramePumpPort;
+  private readonly createFramePump: (lease: CameraLease) => FramePumpPort;
   private readonly wait: (milliseconds: number) => Promise<void>;
   private readonly analysisWidth: number;
   private readonly analysisHeight: number;
@@ -127,7 +127,7 @@ export class OpticalTimeController {
   private readonly minimumContrast: number;
   private readonly observations: OpticalTimeObservation[] = [];
   private readonly recentDecodes: boolean[] = [];
-  private lease: CameraLeasePort | undefined;
+  private lease: CameraLease | undefined;
   private pump: FramePumpPort | undefined;
   private levels: CellLevels | undefined;
   private rects: PanelRect[] = [];
@@ -244,7 +244,7 @@ export class OpticalTimeController {
     this.pipelineState = 'acquiring-camera';
     this.code = '';
     this.message = '';
-    let lease: CameraLeasePort;
+    let lease: CameraLease;
     try {
       lease = await requireCameraSource(this.runtime).acquireCamera({
         owner: 'time-space-sync',
