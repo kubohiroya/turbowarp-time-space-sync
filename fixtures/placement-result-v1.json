@@ -1,0 +1,98 @@
+{
+  "schema": "twtss/placement-result",
+  "version": 1,
+  "referenceId": "wall-projection",
+  "rigId": "studio-rig",
+  "cameras": [
+    {
+      "cameraId": "camera-left",
+      "cameraFromReference": [
+        0.8978747643939715,
+        -0.1059201243581373,
+        -0.4273193591687917,
+        0.07473147061924146,
+        -0.002918918939161956,
+        0.9691731788845406,
+        -0.2463632059441118,
+        0.08781078236513797,
+        0.44024128313539235,
+        0.2224506160629612,
+        0.869886967390886,
+        2.75511841371663,
+        0,
+        0,
+        0,
+        1
+      ],
+      "reprojectionRmsPx": 0.029304,
+      "reprojectionMaxPx": 0.043091,
+      "pointCount": 6,
+      "translationSigmaMeters": 0.004238,
+      "rotationSigmaDeg": 0.228068
+    },
+    {
+      "cameraId": "camera-right",
+      "cameraFromReference": [
+        0.913227174068795,
+        0.07224513163606533,
+        0.4009947250241709,
+        1.4687643189923534,
+        0.007044769575114879,
+        0.9812082712838506,
+        -0.1928229747353538,
+        0.05020898882738785,
+        -0.40738986212712314,
+        0.1789160957517376,
+        0.8955571064521786,
+        1.9535010167737297,
+        0,
+        0,
+        0,
+        1
+      ],
+      "reprojectionRmsPx": 0.064837,
+      "reprojectionMaxPx": 0.107427,
+      "pointCount": 6,
+      "translationSigmaMeters": 0.003187,
+      "rotationSigmaDeg": 0.154623
+    }
+  ],
+  "pairs": [
+    {
+      "from": "camera-left",
+      "to": "camera-right",
+      "toFromFrom": [
+        0.640959,
+        -0.031438,
+        0.766931,
+        -0.689362,
+        -0.015207,
+        0.998445,
+        0.053638,
+        -0.184107,
+        -0.767425,
+        -0.046043,
+        0.639484,
+        0.253042,
+        0,
+        0,
+        0,
+        1
+      ],
+      "baselineMeters": 0.757063,
+      "baselineSigmaMeters": 0.005303
+    }
+  ],
+  "verification": [
+    {
+      "kind": "distance",
+      "a": "camera-left",
+      "b": "camera-right",
+      "expectedMeters": 0.755,
+      "measuredMeters": 0.757063,
+      "residualMeters": 0.002063
+    }
+  ],
+  "degraded": false,
+  "notes": []
+}

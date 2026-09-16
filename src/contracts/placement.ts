@@ -89,12 +89,16 @@ export interface CameraPlacement {
   /**
    * Reprojection error of the rejected planar solution over the accepted one.
    *
-   * A planar pose has two solutions. As the board flattens towards the image
-   * plane their errors converge, and the solver starts choosing between them on
-   * noise. A ratio near one means the pose is not determined, however small the
+   * A planar pose can have two solutions. As the target shows less perspective
+   * their errors converge, and the solver starts choosing between them on
+   * noise; a ratio near one means the pose is not determined however small the
    * residual looks.
+   *
+   * Absent when there is no second solution to compare against, which is what a
+   * target showing plenty of perspective produces. Absent is not a very large
+   * ratio: it says the question did not arise.
    */
-  readonly ippeErrorRatio: number;
+  readonly ippeErrorRatio?: number;
   readonly translationSigmaMeters: number;
   readonly rotationSigmaDeg: number;
 }
@@ -191,7 +195,7 @@ export const placementResultSpec: Spec = object({
       ippeErrorRatio: finite({minimum: 0}),
       translationSigmaMeters: finite({minimum: 0}),
       rotationSigmaDeg: finite({minimum: 0})
-    }),
+    }, ['ippeErrorRatio']),
     minItems: 1,
     maxItems: 64
   },

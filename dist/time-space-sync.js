@@ -3681,7 +3681,7 @@
   			reprojectionRmsPx: round(solution.best.reprojectionRmsPx),
   			reprojectionMaxPx: round(solution.best.reprojectionMaxPx),
   			pointCount: paired.planar.length,
-  			ippeErrorRatio: Number.isFinite(solution.errorRatio) ? round(solution.errorRatio) : 1e6,
+  			...Number.isFinite(solution.errorRatio) ? { ippeErrorRatio: round(solution.errorRatio) } : {},
   			translationSigmaMeters: round(Math.hypot(sigma.translationSigmaMeters, scaleShare)),
   			rotationSigmaDeg: round(sigma.rotationSigmaDeg)
   		});
@@ -3778,8 +3778,16 @@
   		image
   	} : void 0;
   }
+  /**
+  * Trims the published numbers to a precision a camera could support.
+  *
+  * Nine decimals on a metre is a nanometre, which is not a measurement but the
+  * tail of an iterative solve, and it differs between machines that agree about
+  * everything that matters. Six is a micrometre: far finer than any of this can
+  * see, and stable.
+  */
   function round(value) {
-  	return Number.isFinite(value) ? Number(value.toFixed(9)) : 0;
+  	return Number.isFinite(value) ? Number(value.toFixed(6)) : 0;
   }
   //#endregion
   //#region src/runtime-capability.ts

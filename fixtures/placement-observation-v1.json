@@ -1,0 +1,45 @@
+{
+  "schema": "twtss/placement-observation",
+  "version": 1,
+  "cameraId": "camera-left",
+  "referenceId": "wall-projection",
+  "intrinsicProfileId": "cal-2026-09-15-camera-left",
+  "imagePoints": [
+    {
+      "id": "tl",
+      "u": 405.2005,
+      "v": 223.3863
+    },
+    {
+      "id": "tr",
+      "u": 893.2612,
+      "v": 254.8516
+    },
+    {
+      "id": "br",
+      "u": 850.1723,
+      "v": 506.9889
+    },
+    {
+      "id": "bl",
+      "u": 388.8246,
+      "v": 550.0606
+    },
+    {
+      "id": "tm",
+      "u": 681.8677,
+      "v": 241.223
+    },
+    {
+      "id": "bm",
+      "u": 648.2015,
+      "v": 525.7002
+    }
+  ],
+  "imageWidth": 1280,
+  "imageHeight": 720,
+  "capturedAtUs": 1737000000000000,
+  "conditions": {
+    "frameRate": 30
+  }
+}
