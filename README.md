@@ -65,6 +65,28 @@ See [the Japanese implementation proposal](README.ja.md) for responsibilities, d
 
 この文書はローカルの提案草案。実装着手前に本リポジトリのGitHub Issuesへ依存・DoD・チェックリスト・start/done/blockedログを記録する。Issueの作成・投稿は今回の初期配置には含まない。
 
+## Using the results from another extension
+
+The results are plain JSON documents with a schema and a version. Their JSON Schemas are in `schemas/`, and `fixtures/` holds one worked sample of each, produced by running the estimator and the solver rather than written by hand:
+
+| Contract | Sample |
+|---|---|
+| `twtss/optical-time-observation` | `fixtures/optical-time-observation-v1.json` |
+| `twtss/time-correspondence` | `fixtures/time-correspondence-v1.json` |
+| `twtss/placement-reference` | `fixtures/placement-reference-v1.json` |
+| `twtss/placement-observation` | `fixtures/placement-observation-v1.json` |
+| `twtss/placement-result` | `fixtures/placement-result-v1.json` |
+
+Check your reader against the samples rather than against a document you wrote to match your reader. Three things in them are easy to read past:
+
+**A delay is an interval.** `displayToTimestampDelayUs` is the middle of `delayLoUs`..`delayHiUs`, not a measurement with noise around it. Carry the interval; a consumer that keeps only the midpoint has thrown away the part that says how much to trust it.
+
+**`ippeErrorRatio` is absent when there was no second solution.** Absent is not a very large ratio — it says the question did not arise, because the target showed enough perspective to determine its pose. Present and near one is the case to refuse.
+
+**A pose direction cannot be validated.** `cameraFromReference` maps reference points into the camera. Its inverse is also orthonormal, right-handed and affine, so no check you can write will catch it arriving the wrong way round; the sample is what pins the direction. `toFromFrom` in `pairs` is `cameraB_from_reference * reference_from_cameraA`.
+
+The adapter belongs in the consuming repository. This package names no consumer, so that nothing it depends on can end up depending on it.
+
 ## Planned architecture
 
 ```mermaid

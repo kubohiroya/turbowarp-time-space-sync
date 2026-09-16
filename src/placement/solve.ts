@@ -141,7 +141,12 @@ export function solvePlacement(options: SolveOptions): SolveResult {
       reprojectionRmsPx: round(solution.best.reprojectionRmsPx),
       reprojectionMaxPx: round(solution.best.reprojectionMaxPx),
       pointCount: paired.planar.length,
-      ippeErrorRatio: Number.isFinite(solution.errorRatio) ? round(solution.errorRatio) : 1e6,
+      // Left out when the refinement found no second solution to compare
+      // against: reporting a very large ratio would read as a measurement of
+      // how much better this pose fits than one that was never there.
+      ...(Number.isFinite(solution.errorRatio)
+        ? {ippeErrorRatio: round(solution.errorRatio)}
+        : {}),
       translationSigmaMeters: round(Math.hypot(sigma.translationSigmaMeters, scaleShare)),
       rotationSigmaDeg: round(sigma.rotationSigmaDeg)
     });
@@ -244,6 +249,14 @@ function pairPoints(
   return planar.length >= 4 ? {planar, image} : undefined;
 }
 
+/**
+ * Trims the published numbers to a precision a camera could support.
+ *
+ * Nine decimals on a metre is a nanometre, which is not a measurement but the
+ * tail of an iterative solve, and it differs between machines that agree about
+ * everything that matters. Six is a micrometre: far finer than any of this can
+ * see, and stable.
+ */
 function round(value: number): number {
-  return Number.isFinite(value) ? Number(value.toFixed(9)) : 0;
+  return Number.isFinite(value) ? Number(value.toFixed(6)) : 0;
 }

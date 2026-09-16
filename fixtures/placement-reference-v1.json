@@ -1,0 +1,56 @@
+{
+  "schema": "twtss/placement-reference",
+  "version": 1,
+  "referenceId": "wall-projection",
+  "kind": "projection",
+  "points": [
+    {
+      "id": "tl",
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "sigmaMeters": 0.002
+    },
+    {
+      "id": "tr",
+      "x": 1.612,
+      "y": 0.004,
+      "z": 0,
+      "sigmaMeters": 0.002
+    },
+    {
+      "id": "br",
+      "x": 1.609,
+      "y": 0.908,
+      "z": 0,
+      "sigmaMeters": 0.002
+    },
+    {
+      "id": "bl",
+      "x": -0.003,
+      "y": 0.905,
+      "z": 0,
+      "sigmaMeters": 0.002
+    },
+    {
+      "id": "tm",
+      "x": 0.806,
+      "y": 0.002,
+      "z": 0,
+      "sigmaMeters": 0.002
+    },
+    {
+      "id": "bm",
+      "x": 0.803,
+      "y": 0.906,
+      "z": 0,
+      "sigmaMeters": 0.002
+    }
+  ],
+  "planarityResidualMeters": 0,
+  "rectangularityResidualMeters": 0.004,
+  "measuredBy": "tape",
+  "notes": [
+    "Corners measured individually; the projected outline is not a rectangle."
+  ]
+}

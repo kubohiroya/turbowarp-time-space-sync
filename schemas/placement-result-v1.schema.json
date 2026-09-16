@@ -45,7 +45,6 @@
           "reprojectionRmsPx",
           "reprojectionMaxPx",
           "pointCount",
-          "ippeErrorRatio",
           "translationSigmaMeters",
           "rotationSigmaDeg"
         ],

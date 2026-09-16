@@ -1,0 +1,43 @@
+{
+  "schema": "twtss/time-correspondence",
+  "version": 1,
+  "cameraId": "camera-left",
+  "referenceId": "wall-projection",
+  "observerDomain": {
+    "id": "local:9f1c5a2e",
+    "kind": "local-monotonic",
+    "epoch": 0,
+    "uncertaintyUs": 0
+  },
+  "displayDomain": {
+    "id": "webrtc:studio-host",
+    "kind": "webrtc-synchronized",
+    "epoch": 3,
+    "uncertaintyUs": 450
+  },
+  "displayToTimestampDelayUs": 49772,
+  "delayLoUs": 45213,
+  "delayHiUs": 54330,
+  "uncertaintyUs": 4559,
+  "sampleCount": 24,
+  "rejectedCount": 2,
+  "droppedCount": 0,
+  "decodeRate": 0.63,
+  "decodeMarginMin": 41.5,
+  "measuredAtUs": 1737000001000000,
+  "validUntilUs": 1737000031000000,
+  "unidentifiedComponents": [
+    "clockOffset",
+    "cameraPipelineDelay",
+    "displayPipelineDelay",
+    "rollingShutterSkew"
+  ],
+  "degraded": false,
+  "notes": [],
+  "robust": {
+    "median": 49772,
+    "mad": 2000,
+    "p10": 46772,
+    "p90": 52772
+  }
+}

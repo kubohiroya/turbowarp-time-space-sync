@@ -25,6 +25,7 @@
     "dist/",
     "docs/",
     "schemas/",
+    "fixtures/",
     "src/",
     "templates/",
     "README.md",
@@ -48,11 +49,13 @@
     "docs": "node scripts/generate-readme.ts",
     "schemas": "node scripts/generate-schemas.ts",
     "schemas:check": "node scripts/generate-schemas.ts --check",
+    "fixtures": "node scripts/generate-fixtures.ts",
+    "fixtures:check": "node scripts/generate-fixtures.ts --check",
     "docs:check": "pnpm run docs && git diff --exit-code -- README.md",
     "template:readme": "node scripts/apply-readme-template.ts",
     "repo:check": "node scripts/check-repo.ts",
     "pack:check": "npm pack --dry-run --ignore-scripts",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run docs:check && pnpm run schemas:check && pnpm run check:dist && pnpm run repo:check && pnpm run pack:check",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run docs:check && pnpm run schemas:check && pnpm run fixtures:check && pnpm run check:dist && pnpm run repo:check && pnpm run pack:check",
     "check:dist": "pnpm run build && node scripts/check-dist.ts"
   },
   "devDependencies": {
