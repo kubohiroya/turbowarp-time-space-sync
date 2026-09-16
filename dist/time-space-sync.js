@@ -2077,21 +2077,44 @@
   	return { kind: "none" };
   }
   //#endregion
+  //#region node_modules/.pnpm/@kubohiroya+turbowarp-camera-source@0.7.0/node_modules/@kubohiroya/turbowarp-camera-source/dist/runtime.js
+  /**
+  * Where the extension instance puts itself on the VM runtime.
+  *
+  * Present as soon as the extension is registered. Absent means Camera Source is not loaded, which a
+  * consumer has to handle whatever else it does.
+  */
+  var cameraSourceRuntimeKey = "ext_kubohiroyacamerasource";
+  /** Narrows a runtime value to the Camera Source surface, so a missing extension reads as absent. */
+  function readCameraSourceRuntime(runtime) {
+  	if (typeof runtime !== "object" || runtime === null) return void 0;
+  	const candidate = runtime[cameraSourceRuntimeKey];
+  	if (typeof candidate !== "object" || candidate === null) return void 0;
+  	const { acquireCamera } = candidate;
+  	return typeof acquireCamera === "function" ? candidate : void 0;
+  }
+  //#endregion
   //#region src/camera/camera-source.ts
-  var CAMERA_SOURCE_EXTENSION_KEY = "ext_kubohiroyacamerasource";
+  /** Camera Source, or a refusal naming what is missing. */
   function requireCameraSource(runtime) {
-  	const candidate = runtime[CAMERA_SOURCE_EXTENSION_KEY];
-  	if (typeof candidate !== "object" || candidate === null || typeof candidate.acquireCamera !== "function") throw new TimeSpaceSyncError("camera-unavailable", "Camera Source is not loaded.");
-  	return candidate;
+  	const camera = readCameraSourceRuntime(runtime);
+  	if (!camera) throw new TimeSpaceSyncError("camera-unavailable", "Camera Source is not loaded.");
+  	return camera;
   }
   /**
   * The capture settings the browser is willing to report.
   *
-  * Recorded rather than controlled. Decoding fails whenever an exposure spans a
-  * display refresh, so the decode rate is governed by the exposure time, and a
-  * low rate caused by a long exposure looks exactly like one caused by a dim
-  * panel while calling for the opposite remedy. Every field is optional because
-  * every field genuinely may be absent, and an absent setting is left absent.
+  * Read from the track rather than from Camera Source's capability, which is
+  * published only when its own calibration flag is on: the decoder needs the
+  * exposure whether or not anybody is calibrating, and a diagnosis that stops
+  * working because a different extension is configured differently would be
+  * worse than reading the track twice.
+  *
+  * Recorded, never set. Decoding fails whenever an exposure spans a display
+  * refresh, so the decode rate is governed by the exposure time, and a low rate
+  * caused by a long exposure looks exactly like one caused by a dim panel while
+  * calling for the opposite remedy. Every field is optional because every field
+  * genuinely may be absent, and an absent setting is left absent.
   */
   function readCaptureConditions(element) {
   	const track = videoTrackOf(element);

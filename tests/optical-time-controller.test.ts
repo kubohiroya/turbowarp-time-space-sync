@@ -2,9 +2,9 @@ import {describe, expect, it, vi} from 'vitest';
 import golden from './fixtures/optical-time/detector-golden.json';
 import {LocalMonotonicClock, SessionClock} from '../src/clock/index.js';
 import {
-  CAMERA_SOURCE_EXTENSION_KEY,
-  type CameraFrameSourcePort,
-  type CameraLeasePort
+  cameraSourceRuntimeKey,
+  type CameraFrameSource,
+  type CameraLease
 } from '../src/camera/camera-source.js';
 import {
   OpticalTimeController,
@@ -47,7 +47,7 @@ function render(code: number | undefined): LuminanceFrame {
 function setup(
   options: {
     cameraSource?: boolean;
-    acquire?: () => Promise<CameraLeasePort>;
+    acquire?: () => Promise<CameraLease>;
     analysis?: {width: number; height: number};
   } = {}
 ) {
@@ -64,14 +64,18 @@ function setup(
       handler = undefined;
     })
   };
-  const frameSource = {
+  // Typed, not cast: the compiler checks this against Camera Source's own
+  // declaration, so a member added or renamed there stops the build here
+  // rather than showing up in a browser.
+  const frameSource: CameraFrameSource = {
     kind: 'video',
     element: {} as HTMLVideoElement,
     width: 1280,
     height: 720,
+    previewFlip: 'none',
     deviceId: 'device-1'
-  } as CameraFrameSourcePort;
-  const makeLease = (name: string): CameraLeasePort => ({
+  };
+  const makeLease = (name: string): CameraLease => ({
     getFrameSource: () => frameSource,
     release: async () => {
       released.push(name);
@@ -79,7 +83,7 @@ function setup(
   });
   const runtime = {} as TurboWarpRuntime;
   if (options.cameraSource !== false) {
-    runtime[CAMERA_SOURCE_EXTENSION_KEY] = {
+    runtime[cameraSourceRuntimeKey] = {
       acquireCamera: options.acquire ?? (async () => makeLease('lease'))
     };
   }
@@ -294,12 +298,12 @@ describe('cancellation and leases', () => {
     // Acquiring is asynchronous. Without a generation token the late answer
     // overwrites the stop, and the device stays open for the session.
     const harness = setup();
-    let resolveAcquire: ((lease: CameraLeasePort) => void) | undefined;
+    let resolveAcquire: ((lease: CameraLease) => void) | undefined;
     const controller = new OpticalTimeController({
       runtime: {
-        [CAMERA_SOURCE_EXTENSION_KEY]: {
+        [cameraSourceRuntimeKey]: {
           acquireCamera: () =>
-            new Promise<CameraLeasePort>((resolve) => {
+            new Promise<CameraLease>((resolve) => {
               resolveAcquire = resolve;
             })
         }
