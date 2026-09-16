@@ -1,4 +1,8 @@
 node_modules/
+# Built from src/runtime.ts for consumers to import. Sixty declaration files
+# regenerated on every build: reviewing them in each diff would cost more than
+# it catches, and `prepack` rebuilds them before anything is published.
+lib/
 coverage/
 *.log
 .DS_Store

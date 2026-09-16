@@ -21,8 +21,20 @@
     "webgpu"
   ],
   "type": "module",
+  "exports": {
+    "./runtime": {
+      "types": "./lib/runtime.d.ts",
+      "default": "./lib/runtime.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": [
+    "src/index.ts",
+    "dist/*"
+  ],
   "files": [
     "dist/",
+    "lib/",
     "docs/",
     "schemas/",
     "fixtures/",
@@ -43,7 +55,8 @@
   "scripts": {
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit",
-    "build": "vite build",
+    "build": "vite build && tsc -p tsconfig.lib.json",
+    "prepack": "pnpm run build",
     "lint": "eslint src tests scripts vite.config.ts",
     "test": "vitest run",
     "docs": "node scripts/generate-readme.ts",
