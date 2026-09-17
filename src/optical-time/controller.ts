@@ -51,6 +51,38 @@ export interface OpticalTimeStartOptions {
   readonly intrinsicProfileId?: string;
 }
 
+/**
+ * How a delivered frame's reading related to the one before it.
+ *
+ * `continuous` is the only answer that says anything about the reading being
+ * right: the check bits pass for some misreads, and a reading with no recent
+ * predecessor has nothing to be compared against, so `first-reading` is
+ * neither confirmation nor refusal.
+ */
+export type ReadingContinuity = 'no-reading' | 'first-reading' | 'continuous' | 'discontinuous';
+
+/** One frame the running decoder handled, for work that needs the same frame. */
+export interface DecodedFrame {
+  readonly frame: CapturedFrame;
+  /** The panel square in analysis pixels, starting at the display's top-left. */
+  readonly quad: Quad;
+  readonly analysisWidth: number;
+  readonly analysisHeight: number;
+  readonly continuity: ReadingContinuity;
+}
+
+/**
+ * Something following the decoder frame by frame.
+ *
+ * `ended` is called once when the frames stop meaning what they meant --
+ * the decoder stopped, failed, or started calibrating again and may find the
+ * panel somewhere else -- and nothing more is delivered after it.
+ */
+export interface DecodedFrameListener {
+  frame(event: DecodedFrame): void;
+  ended(error: TimeSpaceSyncError): void;
+}
+
 export interface OpticalTimeControllerOptions {
   readonly runtime: TurboWarpRuntime;
   readonly clock: SessionClock;
@@ -127,6 +159,7 @@ export class OpticalTimeController {
   private readonly minimumContrast: number;
   private readonly observations: OpticalTimeObservation[] = [];
   private readonly recentDecodes: boolean[] = [];
+  private readonly frameListeners = new Set<DecodedFrameListener>();
   private lease: CameraLease | undefined;
   private pump: FramePumpPort | undefined;
   private levels: CellLevels | undefined;
@@ -192,6 +225,43 @@ export class OpticalTimeController {
 
   public cameraId(): string {
     return this.start_?.cameraId ?? '';
+  }
+
+  public referenceId(): string {
+    return this.start_?.referenceId ?? '';
+  }
+
+  public patternProfile(): PatternProfile {
+    return this.profile;
+  }
+
+  /** The panel square found by calibration, or undefined unless the decoder is ready. */
+  public panelQuad(): Quad | undefined {
+    return this.pipelineState === 'ready' ? this.quad : undefined;
+  }
+
+  /** The video element frames are drawn from, while a camera is held. */
+  public frameElement(): HTMLVideoElement | undefined {
+    return this.lease?.getFrameSource().element;
+  }
+
+  /**
+   * Follows the running decoder frame by frame.
+   *
+   * Refused unless the decoder is ready: before then there is no calibrated
+   * panel for a follower to rely on. Returns the function that stops following.
+   */
+  public observeFrames(listener: DecodedFrameListener): () => void {
+    if (this.pipelineState !== 'ready' || !this.quad) {
+      throw new TimeSpaceSyncError(
+        'decoder-not-running',
+        'The optical time decoder must be running and calibrated first.'
+      );
+    }
+    this.frameListeners.add(listener);
+    return () => {
+      this.frameListeners.delete(listener);
+    };
   }
 
   public decodeRate(): number {
@@ -280,6 +350,7 @@ export class OpticalTimeController {
 
   public async stop(): Promise<void> {
     this.operation += 1;
+    this.endFrameListeners('Optical time decoding stopped.');
     const calibration = this.calibration;
     if (calibration) {
       calibration.cancelled = true;
@@ -334,6 +405,8 @@ export class OpticalTimeController {
 
   private async runCalibration(seconds: number, token: number): Promise<void> {
     this.requireCalibrationSeconds(seconds);
+    // A follower was relying on the panel where calibration last found it.
+    this.endFrameListeners('The optical time decoder started calibrating again.');
     this.pipelineState = 'calibrating';
     this.code = '';
     this.message = '';
@@ -399,6 +472,7 @@ export class OpticalTimeController {
       }
       this.pipelineState = 'error';
       this.message = error instanceof Error ? error.message : String(error);
+      this.endFrameListeners(this.message);
     }
   }
 
@@ -415,19 +489,61 @@ export class OpticalTimeController {
     const samples = this.sample(frame.luminance);
     if (!samples) {
       this.recordDecodeAttempt(false);
+      this.notifyFrame(frame, 'no-reading');
       return;
     }
     const code = levels.decode(samples);
     this.lastDecodeMargin = levels.decodeMargin(samples);
     this.recordDecodeAttempt(code !== undefined);
-    if (code === undefined) return;
-    if (!this.passesContinuity(code, frame)) {
+    if (code === undefined) {
+      this.notifyFrame(frame, 'no-reading');
+      return;
+    }
+    const continuity = this.continuityOf(code, frame);
+    if (continuity === 'discontinuous') {
       this.rejectedObservations += 1;
+      this.notifyFrame(frame, continuity);
       return;
     }
     levels.track(samples);
     this.observations.push(this.observationFor(code, frame, start, levels, samples));
     this.expire();
+    this.notifyFrame(frame, continuity);
+  }
+
+  private notifyFrame(frame: CapturedFrame, continuity: ReadingContinuity): void {
+    const quad = this.quad;
+    if (!quad || this.frameListeners.size === 0) return;
+    const event: DecodedFrame = {
+      frame,
+      quad,
+      analysisWidth: this.analysisWidth,
+      analysisHeight: this.analysisHeight,
+      continuity
+    };
+    for (const listener of [...this.frameListeners]) {
+      // A follower's failure is its own. Letting it escape would stop the
+      // decoder over work the decoder was never asked to do.
+      try {
+        listener.frame(event);
+      } catch {
+        // The follower is expected to settle itself; nothing to do here.
+      }
+    }
+  }
+
+  private endFrameListeners(message: string): void {
+    if (this.frameListeners.size === 0) return;
+    const listeners = [...this.frameListeners];
+    this.frameListeners.clear();
+    const error = new TimeSpaceSyncError('decoder-not-running', message);
+    for (const listener of listeners) {
+      try {
+        listener.ended(error);
+      } catch {
+        // As above: ending is the follower's to handle.
+      }
+    }
   }
 
   /**
@@ -439,14 +555,14 @@ export class OpticalTimeController {
    * time on this computer's own clock catches both, and needs no agreement with
    * any other clock to do it.
    */
-  private passesContinuity(code: number, frame: CapturedFrame): boolean {
+  private continuityOf(code: number, frame: CapturedFrame): ReadingContinuity {
     const previous = this.lastDecode;
     this.lastDecode = {code, monotonicAtUs: frame.monotonicAtUs};
-    if (!previous) return true;
+    if (!previous) return 'first-reading';
     const elapsedUs = frame.monotonicAtUs - previous.monotonicAtUs;
-    if (elapsedUs <= 0) return true;
+    if (elapsedUs <= 0) return 'first-reading';
     const wrap = wrapUs(this.profile);
-    if (elapsedUs >= wrap / 2) return true;
+    if (elapsedUs >= wrap / 2) return 'first-reading';
     const advanced =
       patternTimestampUs(code, this.profile) - patternTimestampUs(previous.code, this.profile);
     // Folded to the half period nearest zero, so a reading that went slightly
@@ -465,7 +581,7 @@ export class OpticalTimeController {
     // costs correctness.
     const allowance =
       (this.start_?.displayRefreshUs ?? 0) + (this.start_?.refreshUncertaintyUs ?? 0);
-    return Math.abs(signed - elapsedUs) <= allowance;
+    return Math.abs(signed - elapsedUs) <= allowance ? 'continuous' : 'discontinuous';
   }
 
   private observationFor(
@@ -654,6 +770,7 @@ export class OpticalTimeController {
     this.pipelineState = 'error';
     this.code = code;
     this.message = error instanceof Error ? error.message : String(error);
+    this.endFrameListeners(this.message);
     this.pump?.stop();
     this.pump = undefined;
     const lease = this.lease;

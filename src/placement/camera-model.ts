@@ -126,3 +126,96 @@ export function undistort(
   }
   return current;
 }
+
+export type CameraModelParse =
+  | {
+      readonly ok: true;
+      readonly intrinsics: Intrinsics;
+      readonly distortion: Distortion;
+      readonly intrinsicProfileId?: string;
+      readonly imageWidth?: number;
+      readonly imageHeight?: number;
+    }
+  | {readonly ok: false; readonly code: 'invalid-payload' | 'unsupported-distortion-model'; readonly message: string};
+
+/**
+ * Reads a camera model document, refusing anything that does not state its lens fully.
+ *
+ * The accepted shape is `{intrinsics: {fx, fy, cx, cy, skew}, distortion:
+ * {model, coefficients}}`, optionally with `intrinsicProfileId`, `imageWidth`
+ * and `imageHeight`; the pattern corner blocks produce exactly that.
+ *
+ * Camera Source's `camera intrinsics JSON` is refused with
+ * `unsupported-distortion-model`. It carries the pinhole numbers adapted to the
+ * frame but no distortion, and reading its absence as "no distortion" would
+ * move every pose solved through a webcam lens while the residual stayed small.
+ * The distortion is in the profile Camera Source holds, so the model is built
+ * on the camera's own computer, where both are available.
+ */
+export function parseCameraModel(value: unknown): CameraModelParse {
+  if (typeof value !== 'object' || value === null) {
+    return {ok: false, code: 'invalid-payload', message: 'A camera model must be a JSON object.'};
+  }
+  const record = value as Record<string, unknown>;
+  if (record.intrinsics === undefined && typeof record.fx === 'number') {
+    return {
+      ok: false,
+      code: 'unsupported-distortion-model',
+      message:
+        'These intrinsics state no distortion model. Use the camera model JSON block on the camera computer, which adds the distortion from the registered profile.'
+    };
+  }
+  const intrinsics = record.intrinsics as Record<string, unknown> | undefined;
+  const keys = ['fx', 'fy', 'cx', 'cy', 'skew'] as const;
+  if (
+    typeof intrinsics !== 'object' ||
+    intrinsics === null ||
+    !keys.every((key) => typeof intrinsics[key] === 'number' && Number.isFinite(intrinsics[key])) ||
+    !((intrinsics.fx as number) > 0) ||
+    !((intrinsics.fy as number) > 0)
+  ) {
+    return {ok: false, code: 'invalid-payload', message: 'The intrinsics need finite fx, fy, cx, cy and skew.'};
+  }
+  const distortion = record.distortion as Record<string, unknown> | undefined;
+  if (typeof distortion !== 'object' || distortion === null || typeof distortion.model !== 'string') {
+    return {
+      ok: false,
+      code: 'unsupported-distortion-model',
+      message: 'The camera model states no distortion model.'
+    };
+  }
+  const coefficients = distortion.coefficients;
+  if (
+    !Array.isArray(coefficients) ||
+    !coefficients.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
+  ) {
+    return {ok: false, code: 'invalid-payload', message: 'Distortion coefficients must be finite numbers.'};
+  }
+  const profileId = record.intrinsicProfileId;
+  if (profileId !== undefined && (typeof profileId !== 'string' || profileId.length === 0)) {
+    return {ok: false, code: 'invalid-payload', message: 'intrinsicProfileId must be a non-empty string.'};
+  }
+  for (const key of ['imageWidth', 'imageHeight'] as const) {
+    const size = record[key];
+    if (size !== undefined && !(Number.isInteger(size) && (size as number) > 0)) {
+      return {ok: false, code: 'invalid-payload', message: `${key} must be a positive integer.`};
+    }
+  }
+  return {
+    ok: true,
+    intrinsics: {
+      fx: intrinsics.fx as number,
+      fy: intrinsics.fy as number,
+      cx: intrinsics.cx as number,
+      cy: intrinsics.cy as number,
+      skew: intrinsics.skew as number
+    },
+    distortion: {
+      model: distortion.model as Distortion['model'],
+      coefficients: [...(coefficients as number[])]
+    },
+    ...(profileId === undefined ? {} : {intrinsicProfileId: profileId as string}),
+    ...(record.imageWidth === undefined ? {} : {imageWidth: record.imageWidth as number}),
+    ...(record.imageHeight === undefined ? {} : {imageHeight: record.imageHeight as number})
+  };
+}

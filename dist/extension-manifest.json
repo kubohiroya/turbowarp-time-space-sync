@@ -28,6 +28,16 @@
       ]
     },
     {
+      "opcode": "cameraModelJson",
+      "blockType": "REPORTER",
+      "arguments": [
+        {
+          "id": "CAMERA_ID",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
       "opcode": "clearPlacement",
       "blockType": "COMMAND",
       "arguments": []
@@ -61,6 +71,16 @@
       "opcode": "latestOpticalTimeObservationJson",
       "blockType": "REPORTER",
       "arguments": []
+    },
+    {
+      "opcode": "measurePatternCorners",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "SECONDS",
+          "type": "NUMBER"
+        }
+      ]
     },
     {
       "opcode": "opticalTimeDecodeMargin",
@@ -108,6 +128,43 @@
       "arguments": []
     },
     {
+      "opcode": "patternCornerError",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "patternCornerObservationJson",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "patternCornerSpreadPx",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "patternReferenceJson",
+      "blockType": "REPORTER",
+      "arguments": [
+        {
+          "id": "CORNERS",
+          "type": "STRING"
+        },
+        {
+          "id": "MEASURED_BY",
+          "type": "STRING"
+        },
+        {
+          "id": "REFERENCE_ID",
+          "type": "STRING"
+        },
+        {
+          "id": "SIGMA_METERS",
+          "type": "NUMBER"
+        }
+      ]
+    },
+    {
       "opcode": "placementError",
       "blockType": "REPORTER",
       "arguments": []
@@ -137,6 +194,16 @@
         },
         {
           "id": "MODEL_JSON",
+          "type": "STRING"
+        }
+      ]
+    },
+    {
+      "opcode": "setTimePatternProfile",
+      "blockType": "COMMAND",
+      "arguments": [
+        {
+          "id": "PROFILE_ID",
           "type": "STRING"
         }
       ]
@@ -205,6 +272,11 @@
     },
     {
       "opcode": "timeCorrespondenceUncertaintyUs",
+      "blockType": "REPORTER",
+      "arguments": []
+    },
+    {
+      "opcode": "timePatternProfileError",
       "blockType": "REPORTER",
       "arguments": []
     },

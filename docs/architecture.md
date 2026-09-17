@@ -83,7 +83,7 @@ pnpm run test
 pnpm run repo:check
 ```
 
-Package identity: `@kubohiroya/turbowarp-time-space-sync@0.1.0` (local scaffold, not a published installation).
+Package identity: `@kubohiroya/turbowarp-time-space-sync@0.2.0` (local scaffold, not a published installation).
 Bundle: `dist/time-space-sync.js`. Contract: `dist/extension-manifest.json`.
 
 `pnpm run check` additionally checks generated files against Git. Run it after the initial files have been committed. No initial commit or remote publication is performed by scaffolding.

@@ -1,5 +1,15 @@
 import {TimeSpaceSyncError} from '../contracts/index.js';
-import {cornersOf, quadArea, type Point, type Quad} from './homography.js';
+import {
+  applyHomography,
+  cornersOf,
+  homographyFromUnitSquare,
+  invertHomography,
+  quadArea,
+  type Point,
+  type Quad
+} from './homography.js';
+import {intersectLines, offsetLine, robustFitLine, signedDistance, type Line} from './line-fit.js';
+import {litOutlineInset} from './pattern-geometry.js';
 import type {LuminanceFrame, PanelRect} from './sampling.js';
 import type {PatternProfile} from './pattern-profile.js';
 
@@ -120,6 +130,12 @@ export class PanelRangeAccumulator {
       const range = (this.maximum[index] ?? 0) - (this.minimum[index] ?? 0);
       mask[index] = range >= threshold ? 1 : 0;
     }
+    // The display draws a dark gap between cells, and once the panel is large
+    // enough in the frame a gap is a whole analysis pixel wide and never
+    // changes. The panel then falls apart into one region per cell, which reads
+    // as many panels at once. Closing the mask bridges gaps that narrow without
+    // joining anything that is genuinely separate.
+    closeMask(mask, this.width, this.height, MASK_CLOSING_RADIUS);
     const regions = findRegions(mask, this.width, this.height);
     const best = regions[0];
     if (!best) return {ok: false, reason: 'no-changing-region'};
@@ -147,16 +163,213 @@ export class PanelRangeAccumulator {
     }
     // A rotated panel does not fill its bounding box, so the fill check is made
     // against the corners the panel actually has rather than the box around it.
-    const quad = cornersOf(best.points);
-    if (!quad) return {ok: false, reason: 'wrong-shape'};
+    const extremes = cornersOf(best.points);
+    if (!extremes) return {ok: false, reason: 'wrong-shape'};
     if (
-      best.area / Math.abs(quadArea(quad)) < settings.minimumFillRatio ||
+      best.area / Math.abs(quadArea(extremes)) < settings.minimumFillRatio ||
       best.area / (width * height) < settings.minimumBoxFillRatio
     ) {
       return {ok: false, reason: 'not-solid'};
     }
+    let quad: Quad = extremes;
+    if (profile.fiducials.length > 0) {
+      // The fiducials are lit in every code, so they never change and the
+      // changing region is the panel with its corner cells cut away. Its extreme
+      // points are the corners of those notches, a cell away from the panel's
+      // own corners, and a homography built on them samples every cell off
+      // centre. The panel's edges survive the notches, so its corners are
+      // recovered where those edges meet.
+      const outline = fitPanelOutline(best.boundary, extremes);
+      if (!outline) return {ok: false, reason: 'wrong-shape'};
+      quad = startAtTopLeft(panelSquareFromOutline(outline, profile));
+    }
     return {ok: true, panel: {x: best.minX, y: best.minY, width, height}, quad};
   }
+}
+
+/**
+ * Analysis pixels bridged between neighbouring cells: gaps up to twice this.
+ *
+ * The gap is 8% of a cell, so two pixels either side covers every panel whose
+ * cells are under fifty analysis pixels, which is larger than a panel that
+ * still fits in the frame. Two separate flickering things closer than four
+ * pixels are not told apart, which at this resolution they could not be anyway.
+ */
+const MASK_CLOSING_RADIUS = 2;
+
+/**
+ * Morphological closing with a square window, in place.
+ *
+ * Dilation then erosion, each separable into a row pass and a column pass.
+ * Outside the image counts as set during the erosion, so a panel touching the
+ * frame edge is not eaten away from that side.
+ */
+function closeMask(mask: Uint8Array, width: number, height: number, radius: number): void {
+  const scratch = new Uint8Array(mask.length);
+  sweep(mask, scratch, width, height, radius, 'dilate', 'rows');
+  sweep(scratch, mask, width, height, radius, 'dilate', 'columns');
+  sweep(mask, scratch, width, height, radius, 'erode', 'rows');
+  sweep(scratch, mask, width, height, radius, 'erode', 'columns');
+}
+
+/**
+ * One pass of a running maximum or minimum along rows or columns.
+ *
+ * The window is tracked as a running count of set pixels, so a pass costs the
+ * same whatever the radius.
+ */
+function sweep(
+  input: Uint8Array,
+  output: Uint8Array,
+  width: number,
+  height: number,
+  radius: number,
+  operation: 'dilate' | 'erode',
+  direction: 'rows' | 'columns'
+): void {
+  const dilate = operation === 'dilate';
+  const rows = direction === 'rows';
+  const lines = rows ? height : width;
+  const length = rows ? width : height;
+  const window = radius * 2 + 1;
+  const outside = dilate ? 0 : 1;
+  for (let line = 0; line < lines; line += 1) {
+    const step = rows ? 1 : width;
+    const base = rows ? line * width : line;
+    const valueAt = (position: number): number =>
+      position < 0 || position >= length ? outside : (input[base + position * step] as number);
+    let count = 0;
+    for (let position = -radius; position <= radius; position += 1) count += valueAt(position);
+    for (let position = 0; position < length; position += 1) {
+      output[base + position * step] = dilate ? (count > 0 ? 1 : 0) : count === window ? 1 : 0;
+      count += valueAt(position + radius + 1) - valueAt(position - radius);
+    }
+  }
+}
+
+/** Share of an edge, at each end, not used to fit it: the notches live there. */
+const OUTLINE_EDGE_MARGIN = 0.2;
+/**
+ * How far from an edge, in unit-square terms, a boundary point may lie and count for it.
+ *
+ * Wide on the first pass, because the first estimate comes from the notch
+ * corners and can have an edge a whole cell inside the real one. Measured in
+ * that shrunken estimate's own units a cell is a quarter of it, and a small
+ * panel adds a pixel or two of rounding on top. Narrow afterwards, so the
+ * notch sides and anything else near the panel stop contributing once the
+ * edges are roughly known.
+ */
+const OUTLINE_FIRST_EDGE_BAND = 0.45;
+const OUTLINE_EDGE_BAND = 0.1;
+/** Analysis pixels beyond which a boundary point is dropped from an edge fit. */
+const OUTLINE_TRIM_PIXELS = 1.5;
+const OUTLINE_PASSES = 3;
+const OUTLINE_MINIMUM_EDGE_POINTS = 4;
+
+/**
+ * The quadrilateral whose edges the changing region's boundary follows.
+ *
+ * Each boundary pixel is assigned to the nearest edge of the current estimate,
+ * but only from the middle of that edge: near its ends are the notches, whose
+ * sides run across the edge rather than along it. Lines are fitted to each
+ * edge and intersected, and the result is used to assign the points again, so
+ * a first estimate a whole cell out at each corner still settles on the panel.
+ */
+function fitPanelOutline(boundary: readonly Point[], initial: Quad): Quad | undefined {
+  let quad = initial;
+  for (let pass = 0; pass < OUTLINE_PASSES; pass += 1) {
+    const inverse = invertHomography(homographyFromUnitSquare(quad));
+    if (inverse.length !== 9) return undefined;
+    const edges: Point[][] = [[], [], [], []];
+    for (const point of boundary) {
+      const unit = applyHomography(inverse, point.x, point.y);
+      if (!unit) continue;
+      // Distance to each unit edge, and the position along it.
+      const candidates: Array<[number, number]> = [
+        [Math.abs(unit.y), unit.x],
+        [Math.abs(1 - unit.x), unit.y],
+        [Math.abs(1 - unit.y), unit.x],
+        [Math.abs(unit.x), unit.y]
+      ];
+      let nearest = 0;
+      candidates.forEach(([distance], index) => {
+        if (distance < (candidates[nearest] as [number, number])[0]) nearest = index;
+      });
+      const [distance, along] = candidates[nearest] as [number, number];
+      if (distance > (pass === 0 ? OUTLINE_FIRST_EDGE_BAND : OUTLINE_EDGE_BAND)) continue;
+      if (along < OUTLINE_EDGE_MARGIN || along > 1 - OUTLINE_EDGE_MARGIN) continue;
+      (edges[nearest] as Point[]).push(point);
+    }
+    const centre = quadCentre(quad);
+    const lines: Line[] = [];
+    for (const points of edges) {
+      if (points.length < OUTLINE_MINIMUM_EDGE_POINTS) return undefined;
+      const fit = robustFitLine(points, OUTLINE_TRIM_PIXELS);
+      if (!fit || fit.count < OUTLINE_MINIMUM_EDGE_POINTS) return undefined;
+      // Boundary pixels are the outermost pixels inside the region, so their
+      // centres sit about half a pixel inside the edge they belong to.
+      const outward = signedDistance(fit.line, centre) > 0 ? -0.5 : 0.5;
+      lines.push(offsetLine(fit.line, outward));
+    }
+    const corners: Point[] = [];
+    for (let index = 0; index < 4; index += 1) {
+      const corner = intersectLines(lines[(index + 3) % 4] as Line, lines[index] as Line);
+      if (!corner) return undefined;
+      corners.push(corner);
+    }
+    const next = corners as unknown as Quad;
+    if (!(quadArea(next) > 0)) return undefined;
+    quad = next;
+  }
+  return quad;
+}
+
+/**
+ * Extends the lit outline out to the square the cells are laid out on.
+ *
+ * Every cell is drawn inset by half a gap, so the region's edge lies half a gap
+ * inside the panel square. Sampling maps the square, so the corners are moved
+ * out through the outline's own homography rather than by a fixed number of
+ * pixels, which would be wrong on any view that is not square on.
+ */
+function panelSquareFromOutline(outline: Quad, profile: PatternProfile): Quad {
+  const inset = litOutlineInset(profile);
+  const ex = inset.x / (1 - 2 * inset.x);
+  const ey = inset.y / (1 - 2 * inset.y);
+  const homography = homographyFromUnitSquare(outline);
+  const corner = (x: number, y: number): Point => applyHomography(homography, x, y) ?? {x, y};
+  return [
+    corner(-ex, -ey),
+    corner(1 + ex, -ey),
+    corner(1 + ex, 1 + ey),
+    corner(-ex, 1 + ey)
+  ];
+}
+
+/**
+ * Starts the corner order at the corner nearest the image's top-left.
+ *
+ * Which corner a detector calls the origin decides which cell it reads as
+ * which, so it has to be fixed by something other than the order the pixels
+ * happened to be visited in. The top-left-most corner is the display's own
+ * top-left for any camera roll within 45 degrees either way. Beyond that the
+ * cells are read turned, and a turned reading of the constant-luminance
+ * pattern fails its pairs and its check bits for every code.
+ */
+export function startAtTopLeft(quad: Quad): Quad {
+  let start = 0;
+  quad.forEach((point, index) => {
+    const best = quad[start] as Point;
+    if (point.x + point.y < best.x + best.y) start = index;
+  });
+  return [0, 1, 2, 3].map((offset) => quad[(start + offset) % 4] as Point) as unknown as Quad;
+}
+
+function quadCentre(quad: Quad): Point {
+  return {
+    x: quad.reduce((total, point) => total + point.x, 0) / 4,
+    y: quad.reduce((total, point) => total + point.y, 0) / 4
+  };
 }
 
 /**
@@ -190,6 +403,8 @@ interface Region {
    * extremes pin them when it is turned about 45 degrees.
    */
   points: Point[];
+  /** Region pixels with a neighbour outside the region or outside the image. */
+  boundary: Point[];
 }
 
 /** Connected regions of the mask, largest first. */
@@ -207,6 +422,7 @@ function findRegions(mask: Uint8Array, width: number, height: number): Region[] 
     let maxX = 0;
     let maxY = 0;
     const extremes: Point[] = [];
+    const boundary: Point[] = [];
     while (stack.length > 0) {
       const index = stack.pop() as number;
       const x = index % width;
@@ -217,12 +433,24 @@ function findRegions(mask: Uint8Array, width: number, height: number): Region[] 
       if (y < minY) minY = y;
       if (y > maxY) maxY = y;
       trackExtreme(extremes, {x, y});
+      if (
+        x === 0 ||
+        y === 0 ||
+        x + 1 === width ||
+        y + 1 === height ||
+        mask[index - 1] !== 1 ||
+        mask[index + 1] !== 1 ||
+        mask[index - width] !== 1 ||
+        mask[index + width] !== 1
+      ) {
+        boundary.push({x, y});
+      }
       if (x > 0) push(index - 1);
       if (x + 1 < width) push(index + 1);
       if (y > 0) push(index - width);
       if (y + 1 < height) push(index + width);
     }
-    regions.push({minX, minY, maxX, maxY, area, points: extremes});
+    regions.push({minX, minY, maxX, maxY, area, points: extremes, boundary});
   }
   return regions.sort((left, right) => right.area - left.area);
 

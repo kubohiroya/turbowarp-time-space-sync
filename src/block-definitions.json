@@ -66,6 +66,27 @@
       "arguments": {}
     },
     {
+      "opcode": "setTimePatternProfile",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "COMMAND",
+      "text": "use time pattern profile [PROFILE_ID]",
+      "description": "Chooses the pattern the display draws and the decoder reads: twtss.pattern.v1 (the default) or twtss.pattern.v2, which keeps the panel's brightness constant and has lit corner cells that placement can be measured from. Run it before showing the pattern or starting the decoder; once either exists with another profile the choice is refused and nothing changes. The choice lasts until the project stops.",
+      "arguments": {
+        "PROFILE_ID": {
+          "type": "STRING",
+          "defaultValue": "twtss.pattern.v2"
+        }
+      }
+    },
+    {
+      "opcode": "timePatternProfileError",
+      "feature": "opticalTimeSyncV1",
+      "blockType": "REPORTER",
+      "text": "time pattern profile error",
+      "description": "Returns why the last profile choice was refused -- unknown-pattern-profile or pattern-profile-in-use -- or an empty string when it was accepted.",
+      "arguments": {}
+    },
+    {
       "opcode": "startOpticalTimeDecoder",
       "feature": "opticalTimeSyncV1",
       "blockType": "COMMAND",
@@ -278,7 +299,7 @@
       "feature": "placementSolveV1",
       "blockType": "COMMAND",
       "text": "set camera model for [CAMERA_ID] to [MODEL_JSON]",
-      "description": "Supplies the intrinsics and distortion to interpret one camera pixels with. Take these from Camera Source rather than scaling a calibration profile yourself: only it can tell a scaled capture from a cropped one.",
+      "description": "Supplies the intrinsics and distortion to interpret one camera pixels with, as {intrinsics, distortion} with optional intrinsicProfileId, imageWidth and imageHeight, which a solve checks each observation against. Build it with camera model JSON on the camera computer rather than scaling a calibration profile yourself: only Camera Source can tell a scaled capture from a cropped one.",
       "arguments": {
         "CAMERA_ID": {
           "type": "STRING",
@@ -287,6 +308,81 @@
         "MODEL_JSON": {
           "type": "STRING",
           "defaultValue": "{}"
+        }
+      }
+    },
+    {
+      "opcode": "cameraModelJson",
+      "feature": "placementSolveV1",
+      "blockType": "REPORTER",
+      "text": "camera model JSON for [CAMERA_ID]",
+      "description": "Returns the camera model to pass to set camera model: the intrinsics Camera Source adapted to the current frame, joined with the distortion, profile id and frame size from the calibration profile it holds. Camera Source's own camera intrinsics JSON leaves the distortion out and is refused by set camera model. Empty when Camera Source publishes no calibration, has no profile for the camera, or cannot adapt it to the frame.",
+      "arguments": {
+        "CAMERA_ID": {
+          "type": "STRING",
+          "defaultValue": "default"
+        }
+      }
+    },
+    {
+      "opcode": "measurePatternCorners",
+      "feature": "placementSolveV1",
+      "blockType": "COMMAND",
+      "text": "measure pattern corners for [SECONDS] seconds",
+      "description": "Measures the four outer corners of the projected time pattern in this camera's full-resolution image and builds a twtss/placement-observation from them. Needs the optical time decoder running on twtss.pattern.v2 and a calibration profile for the camera in Camera Source. Each frame's corners are found from the two outer edges of each lit corner cell and the frames are combined by median. The corners are named in the orientation the pattern is drawn, which is only proven while the camera is rolled less than 45 degrees and not seeing the pattern mirrored. A failed measurement clears the previous observation.",
+      "arguments": {
+        "SECONDS": {
+          "type": "NUMBER",
+          "defaultValue": 3
+        }
+      }
+    },
+    {
+      "opcode": "patternCornerObservationJson",
+      "feature": "placementSolveV1",
+      "blockType": "REPORTER",
+      "text": "pattern corner observation JSON",
+      "description": "Returns the last corner measurement as twtss/placement-observation version 1 JSON, with points tl, tr, br and bl in unmirrored source pixels as observed, or an empty string when there is none.",
+      "arguments": {}
+    },
+    {
+      "opcode": "patternCornerError",
+      "feature": "placementSolveV1",
+      "blockType": "REPORTER",
+      "text": "pattern corner error",
+      "description": "Returns why the last corner measurement failed -- for example decoder-not-running, profile-without-fiducials, intrinsic-profile-missing, too-few-corner-frames, corners-unstable or orientation-unproven -- or an empty string when it succeeded.",
+      "arguments": {}
+    },
+    {
+      "opcode": "patternCornerSpreadPx",
+      "feature": "placementSolveV1",
+      "blockType": "REPORTER",
+      "text": "pattern corner spread px",
+      "description": "Returns how far the per-frame corners scattered around the measured ones, as an RMS distance in source pixels. Reported for a measurement refused as corners-unstable as well, so the operator can see by how much.",
+      "arguments": {}
+    },
+    {
+      "opcode": "patternReferenceJson",
+      "feature": "placementSolveV1",
+      "blockType": "REPORTER",
+      "text": "pattern reference JSON [REFERENCE_ID] corners [CORNERS] sigma [SIGMA_METERS] measured by [MEASURED_BY]",
+      "description": "Builds the twtss/placement-reference for the projected pattern from the outer corners of its lit corner cells, measured on the wall: tlX,tlY;trX,trY;brX,brY;blX,blY in metres on the wall plane, with any right-angled axes. The rectangularity residual is the largest distance from a corner to the best-fitting rectangle. Returns an empty string when a value is not a number, the corners do not trace a convex outline in that order, or measured by is not tape, laser or nominal.",
+      "arguments": {
+        "REFERENCE_ID": {
+          "type": "STRING",
+          "defaultValue": "wall-projection"
+        },
+        "CORNERS": {
+          "type": "STRING",
+          "defaultValue": "0,0;0.7,0;0.7,0.7;0,0.7"
+        },
+        "SIGMA_METERS": {
+          "type": "NUMBER",
+          "defaultValue": 0.002
+        },
+        "MEASURED_BY": {
+          "type": "STRING",
+          "defaultValue": "tape"
         }
       }
     },

@@ -27,6 +27,17 @@ import {toPlanarReference} from './reference.js';
 export interface CameraModelFor {
   readonly intrinsics: Intrinsics;
   readonly distortion: Distortion;
+  /**
+   * The calibration profile the model came from, when the producer said.
+   *
+   * Checked against each observation's own `intrinsicProfileId`: pixels
+   * measured through one calibration and interpreted with another give a pose
+   * that is wrong by the difference, with a residual that does not show it.
+   */
+  readonly intrinsicProfileId?: string;
+  /** The frame size the intrinsics describe, when the producer said. */
+  readonly imageWidth?: number;
+  readonly imageHeight?: number;
 }
 
 export interface SolveOptions {
@@ -87,6 +98,26 @@ export function solvePlacement(options: SolveOptions): SolveResult {
       };
     }
     requireSupportedDistortion(model.distortion);
+    if (
+      model.intrinsicProfileId !== undefined &&
+      model.intrinsicProfileId !== observation.intrinsicProfileId
+    ) {
+      return {
+        ok: false,
+        code: 'intrinsic-profile-mismatch',
+        message: `Camera ${observation.cameraId} was observed through profile ${observation.intrinsicProfileId} but its model comes from ${model.intrinsicProfileId}.`
+      };
+    }
+    if (
+      (model.imageWidth !== undefined && model.imageWidth !== observation.imageWidth) ||
+      (model.imageHeight !== undefined && model.imageHeight !== observation.imageHeight)
+    ) {
+      return {
+        ok: false,
+        code: 'intrinsic-profile-mismatch',
+        message: `Camera ${observation.cameraId} was observed at ${observation.imageWidth}x${observation.imageHeight} but its model describes ${model.imageWidth}x${model.imageHeight}.`
+      };
+    }
 
     const paired = pairPoints(observation, byId, reference);
     if (!paired) {

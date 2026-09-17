@@ -94,6 +94,25 @@
   			"arguments": {}
   		},
   		{
+  			"opcode": "setTimePatternProfile",
+  			"feature": "opticalTimeSyncV1",
+  			"blockType": "COMMAND",
+  			"text": "use time pattern profile [PROFILE_ID]",
+  			"description": "Chooses the pattern the display draws and the decoder reads: twtss.pattern.v1 (the default) or twtss.pattern.v2, which keeps the panel's brightness constant and has lit corner cells that placement can be measured from. Run it before showing the pattern or starting the decoder; once either exists with another profile the choice is refused and nothing changes. The choice lasts until the project stops.",
+  			"arguments": { "PROFILE_ID": {
+  				"type": "STRING",
+  				"defaultValue": "twtss.pattern.v2"
+  			} }
+  		},
+  		{
+  			"opcode": "timePatternProfileError",
+  			"feature": "opticalTimeSyncV1",
+  			"blockType": "REPORTER",
+  			"text": "time pattern profile error",
+  			"description": "Returns why the last profile choice was refused -- unknown-pattern-profile or pattern-profile-in-use -- or an empty string when it was accepted.",
+  			"arguments": {}
+  		},
+  		{
   			"opcode": "startOpticalTimeDecoder",
   			"feature": "opticalTimeSyncV1",
   			"blockType": "COMMAND",
@@ -300,7 +319,7 @@
   			"feature": "placementSolveV1",
   			"blockType": "COMMAND",
   			"text": "set camera model for [CAMERA_ID] to [MODEL_JSON]",
-  			"description": "Supplies the intrinsics and distortion to interpret one camera pixels with. Take these from Camera Source rather than scaling a calibration profile yourself: only it can tell a scaled capture from a cropped one.",
+  			"description": "Supplies the intrinsics and distortion to interpret one camera pixels with, as {intrinsics, distortion} with optional intrinsicProfileId, imageWidth and imageHeight, which a solve checks each observation against. Build it with camera model JSON on the camera computer rather than scaling a calibration profile yourself: only Camera Source can tell a scaled capture from a cropped one.",
   			"arguments": {
   				"CAMERA_ID": {
   					"type": "STRING",
@@ -309,6 +328,77 @@
   				"MODEL_JSON": {
   					"type": "STRING",
   					"defaultValue": "{}"
+  				}
+  			}
+  		},
+  		{
+  			"opcode": "cameraModelJson",
+  			"feature": "placementSolveV1",
+  			"blockType": "REPORTER",
+  			"text": "camera model JSON for [CAMERA_ID]",
+  			"description": "Returns the camera model to pass to set camera model: the intrinsics Camera Source adapted to the current frame, joined with the distortion, profile id and frame size from the calibration profile it holds. Camera Source's own camera intrinsics JSON leaves the distortion out and is refused by set camera model. Empty when Camera Source publishes no calibration, has no profile for the camera, or cannot adapt it to the frame.",
+  			"arguments": { "CAMERA_ID": {
+  				"type": "STRING",
+  				"defaultValue": "default"
+  			} }
+  		},
+  		{
+  			"opcode": "measurePatternCorners",
+  			"feature": "placementSolveV1",
+  			"blockType": "COMMAND",
+  			"text": "measure pattern corners for [SECONDS] seconds",
+  			"description": "Measures the four outer corners of the projected time pattern in this camera's full-resolution image and builds a twtss/placement-observation from them. Needs the optical time decoder running on twtss.pattern.v2 and a calibration profile for the camera in Camera Source. Each frame's corners are found from the two outer edges of each lit corner cell and the frames are combined by median. The corners are named in the orientation the pattern is drawn, which is only proven while the camera is rolled less than 45 degrees and not seeing the pattern mirrored. A failed measurement clears the previous observation.",
+  			"arguments": { "SECONDS": {
+  				"type": "NUMBER",
+  				"defaultValue": 3
+  			} }
+  		},
+  		{
+  			"opcode": "patternCornerObservationJson",
+  			"feature": "placementSolveV1",
+  			"blockType": "REPORTER",
+  			"text": "pattern corner observation JSON",
+  			"description": "Returns the last corner measurement as twtss/placement-observation version 1 JSON, with points tl, tr, br and bl in unmirrored source pixels as observed, or an empty string when there is none.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "patternCornerError",
+  			"feature": "placementSolveV1",
+  			"blockType": "REPORTER",
+  			"text": "pattern corner error",
+  			"description": "Returns why the last corner measurement failed -- for example decoder-not-running, profile-without-fiducials, intrinsic-profile-missing, too-few-corner-frames, corners-unstable or orientation-unproven -- or an empty string when it succeeded.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "patternCornerSpreadPx",
+  			"feature": "placementSolveV1",
+  			"blockType": "REPORTER",
+  			"text": "pattern corner spread px",
+  			"description": "Returns how far the per-frame corners scattered around the measured ones, as an RMS distance in source pixels. Reported for a measurement refused as corners-unstable as well, so the operator can see by how much.",
+  			"arguments": {}
+  		},
+  		{
+  			"opcode": "patternReferenceJson",
+  			"feature": "placementSolveV1",
+  			"blockType": "REPORTER",
+  			"text": "pattern reference JSON [REFERENCE_ID] corners [CORNERS] sigma [SIGMA_METERS] measured by [MEASURED_BY]",
+  			"description": "Builds the twtss/placement-reference for the projected pattern from the outer corners of its lit corner cells, measured on the wall: tlX,tlY;trX,trY;brX,brY;blX,blY in metres on the wall plane, with any right-angled axes. The rectangularity residual is the largest distance from a corner to the best-fitting rectangle. Returns an empty string when a value is not a number, the corners do not trace a convex outline in that order, or measured by is not tape, laser or nominal.",
+  			"arguments": {
+  				"REFERENCE_ID": {
+  					"type": "STRING",
+  					"defaultValue": "wall-projection"
+  				},
+  				"CORNERS": {
+  					"type": "STRING",
+  					"defaultValue": "0,0;0.7,0;0.7,0.7;0,0.7"
+  				},
+  				"SIGMA_METERS": {
+  					"type": "NUMBER",
+  					"defaultValue": .002
+  				},
+  				"MEASURED_BY": {
+  					"type": "STRING",
+  					"defaultValue": "tape"
   				}
   			}
   		},
@@ -981,7 +1071,21 @@
   	sampling: "grid",
   	fiducials: []
   });
-  Object.freeze({
+  /**
+  * A constant-luminance profile with corner fiducials.
+  *
+  * Each bit takes a pair of cells in opposite states, so every code lights
+  * exactly the same number of cells and the panel's total output does not change
+  * from one code to the next. That removes the whole-panel brightness pulsing,
+  * and it also makes each bit a comparison between two neighbouring cells rather
+  * than a reading against a learned level -- which is what made the v1 levels
+  * vulnerable to uneven projection and to drift.
+  *
+  * Sixteen bits need thirty-two cells; with four corner fiducials that is a 6x6
+  * grid. The cost is resolution: cells are smaller, so the panel has to be
+  * larger in the camera image than v1 needed.
+  */
+  var PATTERN_PROFILE_V2 = Object.freeze({
   	id: "twtss.pattern.v2",
   	columns: 6,
   	rows: 6,
@@ -1200,6 +1304,33 @@
   		y: (at(homography, 3) * x + at(homography, 4) * y + at(homography, 5)) / w
   	};
   }
+  function invertHomography(homography) {
+  	if (homography.length !== 9) return [];
+  	const [a, b, c, d, e, f, g, h, i] = [
+  		0,
+  		1,
+  		2,
+  		3,
+  		4,
+  		5,
+  		6,
+  		7,
+  		8
+  	].map((index) => at(homography, index));
+  	const determinant = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+  	if (determinant === 0 || !Number.isFinite(determinant)) return [];
+  	return [
+  		(e * i - f * h) / determinant,
+  		(c * h - b * i) / determinant,
+  		(b * f - c * e) / determinant,
+  		(f * g - d * i) / determinant,
+  		(a * i - c * g) / determinant,
+  		(c * d - a * f) / determinant,
+  		(d * h - e * g) / determinant,
+  		(b * g - a * h) / determinant,
+  		(a * e - b * d) / determinant
+  	];
+  }
   /**
   * The four corners of a region, in unit-square order.
   *
@@ -1259,6 +1390,472 @@
   }
   function at(values, index) {
   	return values[index] ?? 0;
+  }
+  //#endregion
+  //#region src/optical-time/line-fit.ts
+  /**
+  * The total least squares line: the one minimising perpendicular distances.
+  *
+  * Ordinary least squares minimises vertical distances, which is wrong for an
+  * edge that can run at any angle and undefined for a vertical one.
+  */
+  function fitLine(points) {
+  	if (points.length < 2) return void 0;
+  	let meanX = 0;
+  	let meanY = 0;
+  	for (const point of points) {
+  		meanX += point.x;
+  		meanY += point.y;
+  	}
+  	meanX /= points.length;
+  	meanY /= points.length;
+  	let xx = 0;
+  	let xy = 0;
+  	let yy = 0;
+  	for (const point of points) {
+  		const dx = point.x - meanX;
+  		const dy = point.y - meanY;
+  		xx += dx * dx;
+  		xy += dx * dy;
+  		yy += dy * dy;
+  	}
+  	const angle = .5 * Math.atan2(2 * xy, xx - yy);
+  	const line = {
+  		point: {
+  			x: meanX,
+  			y: meanY
+  		},
+  		direction: {
+  			x: Math.cos(angle),
+  			y: Math.sin(angle)
+  		}
+  	};
+  	if (!(xx + yy > 0)) return void 0;
+  	let squares = 0;
+  	for (const point of points) squares += signedDistance(line, point) ** 2;
+  	return {
+  		line,
+  		rms: Math.sqrt(squares / points.length),
+  		count: points.length
+  	};
+  }
+  /**
+  * Fits, drops the points far from the fit, and fits again.
+  *
+  * An edge sampled across a gap between cells, or through a speck of noise,
+  * yields a point that is not on the edge at all. One such point moves a least
+  * squares line a long way, so points further than `trimDistance` from the
+  * previous fit are left out of the next.
+  */
+  function robustFitLine(points, trimDistance, passes = 2) {
+  	let fit = fitLine(points);
+  	for (let pass = 0; pass < passes && fit; pass += 1) {
+  		const current = fit.line;
+  		const kept = points.filter((point) => Math.abs(signedDistance(current, point)) <= trimDistance);
+  		if (kept.length === points.length) break;
+  		fit = fitLine(kept);
+  	}
+  	return fit;
+  }
+  /** Perpendicular distance, positive to the left of the direction in image axes. */
+  function signedDistance(line, point) {
+  	return (point.x - line.point.x) * -line.direction.y + (point.y - line.point.y) * line.direction.x;
+  }
+  /**
+  * Where two lines meet, or undefined when they are too near parallel to say.
+  *
+  * `minimumSine` bounds the angle between them: two nearly parallel edges meet
+  * at a point that moves a long way for a small change in either, so a corner
+  * found that way is not a measurement.
+  */
+  function intersectLines(a, b, minimumSine = .2) {
+  	const cross = a.direction.x * b.direction.y - a.direction.y * b.direction.x;
+  	if (!(Math.abs(cross) >= minimumSine)) return void 0;
+  	const dx = b.point.x - a.point.x;
+  	const dy = b.point.y - a.point.y;
+  	const t = (dx * b.direction.y - dy * b.direction.x) / cross;
+  	return {
+  		x: a.point.x + t * a.direction.x,
+  		y: a.point.y + t * a.direction.y
+  	};
+  }
+  /** The line moved sideways by `distance`, in the direction `signedDistance` counts positive. */
+  function offsetLine(line, distance) {
+  	return {
+  		point: {
+  			x: line.point.x - line.direction.y * distance,
+  			y: line.point.y + line.direction.x * distance
+  		},
+  		direction: line.direction
+  	};
+  }
+  //#endregion
+  //#region src/optical-time/pattern-geometry.ts
+  /**
+  * Where the lit parts of the panel are, in the panel's own unit square.
+  *
+  * Shared by the display, which draws them, and by everything that has to find
+  * them again in a camera image. A second copy of the gap ratio in a detector
+  * would drift from the one the display draws with, and nothing would fail: the
+  * corners would simply be found a little way from where they are.
+  */
+  /** Share of each cell left as a gap between neighbouring cells. */
+  var PATTERN_CELL_GAP_RATIO = .08;
+  /**
+  * The panel's outer corners, named in the display's own orientation.
+  *
+  * `tl` is the top-left of the pattern as it is drawn, whatever the camera makes
+  * of it. Row-major and clockwise on screen, which is the order the unit square
+  * uses: (0,0), (1,0), (1,1), (0,1).
+  */
+  var PATTERN_CORNER_IDS = [
+  	"tl",
+  	"tr",
+  	"br",
+  	"bl"
+  ];
+  /**
+  * How far the lit outline sits inside the panel square, per axis.
+  *
+  * Each cell is drawn inset by half a gap, so the outer edge of a corner cell
+  * -- the edge a camera sees and a tape measures -- lies half a gap inside the
+  * square the cells are laid out on. The data cells along an edge are inset by
+  * the same amount, which is why the edge of the changing region and the outer
+  * edge of a fiducial lie on one line.
+  */
+  function litOutlineInset(profile) {
+  	return {
+  		x: PATTERN_CELL_GAP_RATIO / 2 / profile.columns,
+  		y: PATTERN_CELL_GAP_RATIO / 2 / profile.rows
+  	};
+  }
+  //#endregion
+  //#region src/optical-time/corner-refinement.ts
+  /** The same allowance for the second pass, which starts from a measured corner. */
+  var REFINED_CORNER_UNCERTAINTY_PX = 1.5;
+  /** Pixels either side of the expected edge beyond the corner uncertainty. */
+  var PROFILE_EXTRA_PX = 4;
+  var PROFILE_STEP_PX = .5;
+  /**
+  * The smallest light-to-dark step, in luminance units, an edge must show.
+  *
+  * Matches the decoder's own contrast floor: an edge the decoder could not read
+  * a cell across is not one to locate a corner on.
+  */
+  var MINIMUM_EDGE_CONTRAST = 24;
+  /** Scanlines per edge; more cost time and add little once the edge is covered. */
+  var SCANLINES_PER_EDGE = 32;
+  var MINIMUM_EDGE_POINTS = 8;
+  /**
+  * The largest RMS distance of edge points from their fitted line.
+  *
+  * A straight edge seen through ordinary sensor noise fits to a tenth of a pixel
+  * or so. Half a pixel means the edge is not straight where it was sampled --
+  * something is in front of it, the frame is smeared by motion, or the window
+  * caught part of a neighbouring cell -- and a corner built on it is not a
+  * measurement.
+  */
+  var MAXIMUM_EDGE_RMS_PX = .5;
+  /** Edge points further than this from the first fit are dropped from the second. */
+  var EDGE_TRIM_PX = 1;
+  /**
+  * The smallest angle two edges may meet at, as a sine: about 20 degrees.
+  *
+  * A square panel seen at any usable angle has corners far wider than this.
+  * Narrower means the view is so oblique that a small error along either edge
+  * moves the corner a long way.
+  */
+  var MINIMUM_CORNER_SINE = .34;
+  /** Largest window read for one corner, per edge, so a huge panel costs no more. */
+  var MAXIMUM_EDGE_SPAN_PX = 96;
+  /** Where along the lit edge scanlines start and stop, as shares of its length. */
+  var EDGE_START_SHARE = .1;
+  var EDGE_END_SHARE = .85;
+  var MINIMUM_EDGE_START_PX = 2;
+  /**
+  * Maps analysis coordinates onto source coordinates.
+  *
+  * The analysis frame is the whole source drawn into a smaller canvas, possibly
+  * with a different aspect, so each axis scales on its own. Analysis positions
+  * are pixel indices, whose centres are half a pixel in from their edges; the
+  * half pixel is added before scaling and taken back afterwards only in the
+  * analysis units, which is what places the result in the source frame's
+  * corner-origin coordinates.
+  */
+  function sourceQuadFromAnalysis(quad, analysis, source) {
+  	const sx = source.width / analysis.width;
+  	const sy = source.height / analysis.height;
+  	return quad.map((point) => ({
+  		x: (point.x + .5) * sx,
+  		y: (point.y + .5) * sy
+  	}));
+  }
+  /**
+  * Refines all four outer corners of a panel.
+  *
+  * `panelQuad` is the panel square in source coordinates in the decoder's order,
+  * which starts at the display's top-left (see `startAtTopLeft`). Every corner
+  * must refine for the result to count: a panel with three good corners and a
+  * guessed fourth gives a pose that is wrong by exactly the guess.
+  */
+  function refinePanelCorners(reader, panelQuad, profile, source, coarseUncertaintyPx) {
+  	const homography = homographyFromUnitSquare(panelQuad);
+  	if (homography.length !== 9) return {
+  		ok: false,
+  		reason: "corner-geometry"
+  	};
+  	const corners = [];
+  	let worst = 0;
+  	for (let index = 0; index < 4; index += 1) {
+  		const plan = planCorner(homography, profile, index);
+  		if (!plan) return {
+  			ok: false,
+  			reason: "corner-geometry"
+  		};
+  		const result = refineCorner(reader, plan, source, coarseUncertaintyPx);
+  		if (!result.ok) return result;
+  		corners.push(result.corner);
+  		worst = Math.max(worst, result.rms);
+  	}
+  	return {
+  		ok: true,
+  		corners,
+  		worstEdgeRmsPx: worst
+  	};
+  }
+  /** Where a corner should be and which way its edges run, from the coarse panel. */
+  function planCorner(homography, profile, index) {
+  	const inset = litOutlineInset(profile);
+  	const signX = index === 0 || index === 3 ? 1 : -1;
+  	const signY = index === 0 || index === 1 ? 1 : -1;
+  	const unit = {
+  		x: signX > 0 ? inset.x : 1 - inset.x,
+  		y: signY > 0 ? inset.y : 1 - inset.y
+  	};
+  	const cellX = (1 - PATTERN_CELL_GAP_RATIO) / profile.columns;
+  	const cellY = (1 - PATTERN_CELL_GAP_RATIO) / profile.rows;
+  	const predicted = applyHomography(homography, unit.x, unit.y);
+  	const endX = applyHomography(homography, unit.x + signX * cellX, unit.y);
+  	const endY = applyHomography(homography, unit.x, unit.y + signY * cellY);
+  	if (!predicted || !endX || !endY) return void 0;
+  	const lengthX = Math.hypot(endX.x - predicted.x, endX.y - predicted.y);
+  	const lengthY = Math.hypot(endY.x - predicted.x, endY.y - predicted.y);
+  	if (!(lengthX > 0) || !(lengthY > 0)) return void 0;
+  	return {
+  		predicted,
+  		along: [{
+  			x: (endX.x - predicted.x) / lengthX,
+  			y: (endX.y - predicted.y) / lengthX
+  		}, {
+  			x: (endY.x - predicted.x) / lengthY,
+  			y: (endY.y - predicted.y) / lengthY
+  		}],
+  		length: [lengthX, lengthY]
+  	};
+  }
+  function refineCorner(reader, plan, source, coarseUncertaintyPx) {
+  	const uncertainty = Math.max(REFINED_CORNER_UNCERTAINTY_PX, coarseUncertaintyPx);
+  	const spans = plan.length.map((length) => Math.min(MAXIMUM_EDGE_SPAN_PX, length * EDGE_END_SHARE - uncertainty));
+  	if (spans[0] <= 4 || spans[1] <= 4) return {
+  		ok: false,
+  		reason: "too-few-edge-points"
+  	};
+  	const reach = uncertainty + PROFILE_EXTRA_PX;
+  	const region = regionAround(plan, spans, reach, source);
+  	if (!region) return {
+  		ok: false,
+  		reason: "outside-image"
+  	};
+  	const frame = reader.read(region);
+  	if (!frame || frame.width !== region.width || frame.height !== region.height) return {
+  		ok: false,
+  		reason: "outside-image"
+  	};
+  	const image = {
+  		frame,
+  		region
+  	};
+  	let corner = plan.predicted;
+  	let along = plan.along;
+  	let reachNow = reach;
+  	let result = {
+  		ok: false,
+  		reason: "too-few-edge-points"
+  	};
+  	for (let pass = 0; pass < 2; pass += 1) {
+  		const lines = [];
+  		let rms = 0;
+  		for (let edge = 0; edge < 2; edge += 1) {
+  			const direction = along[edge];
+  			const inward = along[1 - edge];
+  			const fit = locateEdge(image, corner, direction, inward, spans[edge], plan.length[edge], reachNow);
+  			if (!fit.ok) return fit;
+  			lines.push(fit.line);
+  			rms = Math.max(rms, fit.rms);
+  		}
+  		const [first, second] = lines;
+  		const meeting = intersectLines(first, second, MINIMUM_CORNER_SINE);
+  		if (!meeting) return {
+  			ok: false,
+  			reason: "corner-geometry"
+  		};
+  		if (Math.hypot(meeting.x - corner.x, meeting.y - corner.y) > reachNow) return {
+  			ok: false,
+  			reason: "corner-geometry"
+  		};
+  		corner = meeting;
+  		along = [orient(first.direction, along[0]), orient(second.direction, along[1])];
+  		reachNow = 5.5;
+  		result = {
+  			ok: true,
+  			corner,
+  			rms
+  		};
+  	}
+  	if (!result.ok) return result;
+  	if (corner.x < 0 || corner.y < 0 || corner.x > source.width || corner.y > source.height) return {
+  		ok: false,
+  		reason: "outside-image"
+  	};
+  	return result;
+  }
+  /**
+  * Finds one straight edge running from the corner along `direction`.
+  *
+  * Each scanline crosses the edge at right angles, from outside the panel to
+  * inside, and the edge is placed where the profile crosses halfway between the
+  * dark and light levels measured at its own two ends. The halfway crossing is
+  * where a symmetric blur leaves a step edge, so the estimate does not move with
+  * focus; the levels are local, so uneven projection does not move it either.
+  */
+  function locateEdge(image, corner, direction, inwardHint, span, length, reach) {
+  	let normal = {
+  		x: -direction.y,
+  		y: direction.x
+  	};
+  	if (normal.x * inwardHint.x + normal.y * inwardHint.y < 0) normal = {
+  		x: -normal.x,
+  		y: -normal.y
+  	};
+  	const start = Math.max(MINIMUM_EDGE_START_PX, length * EDGE_START_SHARE);
+  	if (span <= start) return {
+  		ok: false,
+  		reason: "too-few-edge-points"
+  	};
+  	const steps = Math.ceil(reach * 2 / PROFILE_STEP_PX);
+  	const points = [];
+  	let contrastFailures = 0;
+  	for (let line = 0; line < SCANLINES_PER_EDGE; line += 1) {
+  		const t = start + (span - start) * line / 31;
+  		const base = {
+  			x: corner.x + direction.x * t,
+  			y: corner.y + direction.y * t
+  		};
+  		const values = [];
+  		for (let step = 0; step <= steps; step += 1) {
+  			const s = -reach + step * PROFILE_STEP_PX;
+  			const value = bilinear(image, base.x + normal.x * s, base.y + normal.y * s);
+  			if (value === void 0) break;
+  			values.push(value);
+  		}
+  		if (values.length !== steps + 1) continue;
+  		const dark = mean(values.slice(0, 3));
+  		const light = mean(values.slice(-3));
+  		if (light - dark < MINIMUM_EDGE_CONTRAST) {
+  			contrastFailures += 1;
+  			continue;
+  		}
+  		const crossing = crossingNearestCentre(values, (dark + light) / 2, reach);
+  		if (crossing === void 0) continue;
+  		points.push({
+  			x: base.x + normal.x * crossing,
+  			y: base.y + normal.y * crossing
+  		});
+  	}
+  	if (points.length < MINIMUM_EDGE_POINTS) return {
+  		ok: false,
+  		reason: contrastFailures > SCANLINES_PER_EDGE / 2 ? "low-contrast" : "too-few-edge-points"
+  	};
+  	const fit = robustFitLine(points, EDGE_TRIM_PX);
+  	if (!fit || fit.count < MINIMUM_EDGE_POINTS) return {
+  		ok: false,
+  		reason: "too-few-edge-points"
+  	};
+  	if (fit.rms > MAXIMUM_EDGE_RMS_PX) return {
+  		ok: false,
+  		reason: "edge-not-straight"
+  	};
+  	return {
+  		ok: true,
+  		line: fit.line,
+  		rms: fit.rms
+  	};
+  }
+  /**
+  * The dark-to-light crossing of `level` closest to the expected edge.
+  *
+  * Returned as a distance along the scanline from the expected edge. Linear
+  * between samples: the samples are half a pixel apart on an image that is
+  * itself interpolated, and a higher-order fit would be fitting the
+  * interpolation.
+  */
+  function crossingNearestCentre(values, level, reach) {
+  	let best;
+  	for (let index = 1; index < values.length; index += 1) {
+  		const before = values[index - 1];
+  		const after = values[index];
+  		if (!(before < level && after >= level)) continue;
+  		const share = (level - before) / (after - before);
+  		const s = -reach + (index - 1 + share) * PROFILE_STEP_PX;
+  		if (best === void 0 || Math.abs(s) < Math.abs(best)) best = s;
+  	}
+  	return best;
+  }
+  /** The window holding every sample either pass can take, or undefined when it leaves the image. */
+  function regionAround(plan, spans, reach, source) {
+  	const [a, b] = plan.along;
+  	const grow = reach * 2 + 2;
+  	const xs = [];
+  	const ys = [];
+  	for (const [direction, span] of [[a, spans[0]], [b, spans[1]]]) for (const t of [0, span]) {
+  		xs.push(plan.predicted.x + direction.x * t);
+  		ys.push(plan.predicted.y + direction.y * t);
+  	}
+  	const minX = Math.floor(Math.min(...xs) - grow);
+  	const minY = Math.floor(Math.min(...ys) - grow);
+  	const maxX = Math.ceil(Math.max(...xs) + grow);
+  	const maxY = Math.ceil(Math.max(...ys) + grow);
+  	if (minX < 0 || minY < 0 || maxX > source.width || maxY > source.height) return void 0;
+  	return {
+  		x: minX,
+  		y: minY,
+  		width: maxX - minX,
+  		height: maxY - minY
+  	};
+  }
+  function bilinear(image, x, y) {
+  	const { frame, region } = image;
+  	const fx = x - region.x - .5;
+  	const fy = y - region.y - .5;
+  	const x0 = Math.floor(fx);
+  	const y0 = Math.floor(fy);
+  	if (x0 < 0 || y0 < 0 || x0 + 1 >= frame.width || y0 + 1 >= frame.height) return void 0;
+  	const ax = fx - x0;
+  	const ay = fy - y0;
+  	const row = y0 * frame.width;
+  	const next = row + frame.width;
+  	const top = frame.data[row + x0] * (1 - ax) + frame.data[row + x0 + 1] * ax;
+  	const bottom = frame.data[next + x0] * (1 - ax) + frame.data[next + x0 + 1] * ax;
+  	return top * (1 - ay) + bottom * ay;
+  }
+  function orient(direction, hint) {
+  	return direction.x * hint.x + direction.y * hint.y >= 0 ? direction : {
+  		x: -direction.x,
+  		y: -direction.y
+  	};
+  }
+  function mean(values) {
+  	return values.reduce((total, value) => total + value, 0) / values.length;
   }
   //#endregion
   //#region src/optical-time/sampling.ts
@@ -1416,6 +2013,7 @@
   			const range = (this.maximum[index] ?? 0) - (this.minimum[index] ?? 0);
   			mask[index] = range >= threshold ? 1 : 0;
   		}
+  		closeMask(mask, this.width, this.height, MASK_CLOSING_RADIUS);
   		const regions = findRegions(mask, this.width, this.height);
   		const best = regions[0];
   		if (!best) return {
@@ -1438,15 +2036,24 @@
   			ok: false,
   			reason: "wrong-shape"
   		};
-  		const quad = cornersOf(best.points);
-  		if (!quad) return {
+  		const extremes = cornersOf(best.points);
+  		if (!extremes) return {
   			ok: false,
   			reason: "wrong-shape"
   		};
-  		if (best.area / Math.abs(quadArea(quad)) < settings.minimumFillRatio || best.area / (width * height) < settings.minimumBoxFillRatio) return {
+  		if (best.area / Math.abs(quadArea(extremes)) < settings.minimumFillRatio || best.area / (width * height) < settings.minimumBoxFillRatio) return {
   			ok: false,
   			reason: "not-solid"
   		};
+  		let quad = extremes;
+  		if (profile.fiducials.length > 0) {
+  			const outline = fitPanelOutline(best.boundary, extremes);
+  			if (!outline) return {
+  				ok: false,
+  				reason: "wrong-shape"
+  			};
+  			quad = startAtTopLeft(panelSquareFromOutline(outline, profile));
+  		}
   		return {
   			ok: true,
   			panel: {
@@ -1459,6 +2066,184 @@
   		};
   	}
   };
+  /**
+  * Analysis pixels bridged between neighbouring cells: gaps up to twice this.
+  *
+  * The gap is 8% of a cell, so two pixels either side covers every panel whose
+  * cells are under fifty analysis pixels, which is larger than a panel that
+  * still fits in the frame. Two separate flickering things closer than four
+  * pixels are not told apart, which at this resolution they could not be anyway.
+  */
+  var MASK_CLOSING_RADIUS = 2;
+  /**
+  * Morphological closing with a square window, in place.
+  *
+  * Dilation then erosion, each separable into a row pass and a column pass.
+  * Outside the image counts as set during the erosion, so a panel touching the
+  * frame edge is not eaten away from that side.
+  */
+  function closeMask(mask, width, height, radius) {
+  	const scratch = new Uint8Array(mask.length);
+  	sweep(mask, scratch, width, height, radius, "dilate", "rows");
+  	sweep(scratch, mask, width, height, radius, "dilate", "columns");
+  	sweep(mask, scratch, width, height, radius, "erode", "rows");
+  	sweep(scratch, mask, width, height, radius, "erode", "columns");
+  }
+  /**
+  * One pass of a running maximum or minimum along rows or columns.
+  *
+  * The window is tracked as a running count of set pixels, so a pass costs the
+  * same whatever the radius.
+  */
+  function sweep(input, output, width, height, radius, operation, direction) {
+  	const dilate = operation === "dilate";
+  	const rows = direction === "rows";
+  	const lines = rows ? height : width;
+  	const length = rows ? width : height;
+  	const window = radius * 2 + 1;
+  	const outside = dilate ? 0 : 1;
+  	for (let line = 0; line < lines; line += 1) {
+  		const step = rows ? 1 : width;
+  		const base = rows ? line * width : line;
+  		const valueAt = (position) => position < 0 || position >= length ? outside : input[base + position * step];
+  		let count = 0;
+  		for (let position = -radius; position <= radius; position += 1) count += valueAt(position);
+  		for (let position = 0; position < length; position += 1) {
+  			output[base + position * step] = dilate ? count > 0 ? 1 : 0 : count === window ? 1 : 0;
+  			count += valueAt(position + radius + 1) - valueAt(position - radius);
+  		}
+  	}
+  }
+  /** Share of an edge, at each end, not used to fit it: the notches live there. */
+  var OUTLINE_EDGE_MARGIN = .2;
+  /**
+  * How far from an edge, in unit-square terms, a boundary point may lie and count for it.
+  *
+  * Wide on the first pass, because the first estimate comes from the notch
+  * corners and can have an edge a whole cell inside the real one. Measured in
+  * that shrunken estimate's own units a cell is a quarter of it, and a small
+  * panel adds a pixel or two of rounding on top. Narrow afterwards, so the
+  * notch sides and anything else near the panel stop contributing once the
+  * edges are roughly known.
+  */
+  var OUTLINE_FIRST_EDGE_BAND = .45;
+  var OUTLINE_EDGE_BAND = .1;
+  /** Analysis pixels beyond which a boundary point is dropped from an edge fit. */
+  var OUTLINE_TRIM_PIXELS = 1.5;
+  var OUTLINE_PASSES = 3;
+  var OUTLINE_MINIMUM_EDGE_POINTS = 4;
+  /**
+  * The quadrilateral whose edges the changing region's boundary follows.
+  *
+  * Each boundary pixel is assigned to the nearest edge of the current estimate,
+  * but only from the middle of that edge: near its ends are the notches, whose
+  * sides run across the edge rather than along it. Lines are fitted to each
+  * edge and intersected, and the result is used to assign the points again, so
+  * a first estimate a whole cell out at each corner still settles on the panel.
+  */
+  function fitPanelOutline(boundary, initial) {
+  	let quad = initial;
+  	for (let pass = 0; pass < OUTLINE_PASSES; pass += 1) {
+  		const inverse = invertHomography(homographyFromUnitSquare(quad));
+  		if (inverse.length !== 9) return void 0;
+  		const edges = [
+  			[],
+  			[],
+  			[],
+  			[]
+  		];
+  		for (const point of boundary) {
+  			const unit = applyHomography(inverse, point.x, point.y);
+  			if (!unit) continue;
+  			const candidates = [
+  				[Math.abs(unit.y), unit.x],
+  				[Math.abs(1 - unit.x), unit.y],
+  				[Math.abs(1 - unit.y), unit.x],
+  				[Math.abs(unit.x), unit.y]
+  			];
+  			let nearest = 0;
+  			candidates.forEach(([distance], index) => {
+  				if (distance < candidates[nearest][0]) nearest = index;
+  			});
+  			const [distance, along] = candidates[nearest];
+  			if (distance > (pass === 0 ? OUTLINE_FIRST_EDGE_BAND : OUTLINE_EDGE_BAND)) continue;
+  			if (along < OUTLINE_EDGE_MARGIN || along > .8) continue;
+  			edges[nearest].push(point);
+  		}
+  		const centre = quadCentre(quad);
+  		const lines = [];
+  		for (const points of edges) {
+  			if (points.length < OUTLINE_MINIMUM_EDGE_POINTS) return void 0;
+  			const fit = robustFitLine(points, OUTLINE_TRIM_PIXELS);
+  			if (!fit || fit.count < OUTLINE_MINIMUM_EDGE_POINTS) return void 0;
+  			const outward = signedDistance(fit.line, centre) > 0 ? -.5 : .5;
+  			lines.push(offsetLine(fit.line, outward));
+  		}
+  		const corners = [];
+  		for (let index = 0; index < 4; index += 1) {
+  			const corner = intersectLines(lines[(index + 3) % 4], lines[index]);
+  			if (!corner) return void 0;
+  			corners.push(corner);
+  		}
+  		const next = corners;
+  		if (!(quadArea(next) > 0)) return void 0;
+  		quad = next;
+  	}
+  	return quad;
+  }
+  /**
+  * Extends the lit outline out to the square the cells are laid out on.
+  *
+  * Every cell is drawn inset by half a gap, so the region's edge lies half a gap
+  * inside the panel square. Sampling maps the square, so the corners are moved
+  * out through the outline's own homography rather than by a fixed number of
+  * pixels, which would be wrong on any view that is not square on.
+  */
+  function panelSquareFromOutline(outline, profile) {
+  	const inset = litOutlineInset(profile);
+  	const ex = inset.x / (1 - 2 * inset.x);
+  	const ey = inset.y / (1 - 2 * inset.y);
+  	const homography = homographyFromUnitSquare(outline);
+  	const corner = (x, y) => applyHomography(homography, x, y) ?? {
+  		x,
+  		y
+  	};
+  	return [
+  		corner(-ex, -ey),
+  		corner(1 + ex, -ey),
+  		corner(1 + ex, 1 + ey),
+  		corner(-ex, 1 + ey)
+  	];
+  }
+  /**
+  * Starts the corner order at the corner nearest the image's top-left.
+  *
+  * Which corner a detector calls the origin decides which cell it reads as
+  * which, so it has to be fixed by something other than the order the pixels
+  * happened to be visited in. The top-left-most corner is the display's own
+  * top-left for any camera roll within 45 degrees either way. Beyond that the
+  * cells are read turned, and a turned reading of the constant-luminance
+  * pattern fails its pairs and its check bits for every code.
+  */
+  function startAtTopLeft(quad) {
+  	let start = 0;
+  	quad.forEach((point, index) => {
+  		const best = quad[start];
+  		if (point.x + point.y < best.x + best.y) start = index;
+  	});
+  	return [
+  		0,
+  		1,
+  		2,
+  		3
+  	].map((offset) => quad[(start + offset) % 4]);
+  }
+  function quadCentre(quad) {
+  	return {
+  		x: quad.reduce((total, point) => total + point.x, 0) / 4,
+  		y: quad.reduce((total, point) => total + point.y, 0) / 4
+  	};
+  }
   /**
   * The functionals whose maxima are candidate corners.
   *
@@ -1490,6 +2275,7 @@
   		let maxX = 0;
   		let maxY = 0;
   		const extremes = [];
+  		const boundary = [];
   		while (stack.length > 0) {
   			const index = stack.pop();
   			const x = index % width;
@@ -1500,6 +2286,10 @@
   			if (y < minY) minY = y;
   			if (y > maxY) maxY = y;
   			trackExtreme(extremes, {
+  				x,
+  				y
+  			});
+  			if (x === 0 || y === 0 || x + 1 === width || y + 1 === height || mask[index - 1] !== 1 || mask[index + 1] !== 1 || mask[index - width] !== 1 || mask[index + width] !== 1) boundary.push({
   				x,
   				y
   			});
@@ -1514,7 +2304,8 @@
   			maxX,
   			maxY,
   			area,
-  			points: extremes
+  			points: extremes,
+  			boundary
   		});
   	}
   	return regions.sort((left, right) => right.area - left.area);
@@ -1737,7 +2528,6 @@
   * trades against range and wants measuring on real hardware before it is fixed.
   */
   var DEFAULT_PANEL_SCALE = .35;
-  var CELL_GAP_RATIO = .08;
   var DEFAULT_PALETTE = {
   	light: "#ffffff",
   	dark: "#000000",
@@ -1945,8 +2735,8 @@
   	const originY = (height - panel) / 2;
   	const cellWidth = panel / profile.columns;
   	const cellHeight = panel / profile.rows;
-  	const gapX = cellWidth * CELL_GAP_RATIO;
-  	const gapY = cellHeight * CELL_GAP_RATIO;
+  	const gapX = cellWidth * PATTERN_CELL_GAP_RATIO;
+  	const gapY = cellHeight * PATTERN_CELL_GAP_RATIO;
   	for (let row = 0; row < profile.rows; row += 1) for (let column = 0; column < profile.columns; column += 1) {
   		context.fillStyle = cells[row * profile.columns + column] === true ? palette.light : palette.dark;
   		context.fillRect(originX + column * cellWidth + gapX / 2, originY + row * cellHeight + gapY / 2, cellWidth - gapX, cellHeight - gapY);
@@ -2027,13 +2817,7 @@
   			const capture = captureTimeOf(now, metadata, deliveredAtUs);
   			this.context.drawImage(this.element, 0, 0, this.width, this.height);
   			const pixels = this.context.getImageData(0, 0, this.width, this.height).data;
-  			for (let index = 0; index < this.luminance.length; index += 1) {
-  				const offset = index * 4;
-  				const red = pixels[offset] ?? 0;
-  				const green = pixels[offset + 1] ?? 0;
-  				const blue = pixels[offset + 2] ?? 0;
-  				this.luminance[index] = (red * 299 + green * 587 + blue * 114) / 1e3;
-  			}
+  			luminanceFromRgba(pixels, this.luminance);
   			handler({
   				luminance: {
   					width: this.width,
@@ -2054,6 +2838,16 @@
   		}
   	}
   };
+  /** Rec. 601 luma from RGBA bytes, the weighting every reader of frames here uses. */
+  function luminanceFromRgba(pixels, luminance) {
+  	for (let index = 0; index < luminance.length; index += 1) {
+  		const offset = index * 4;
+  		const red = pixels[offset] ?? 0;
+  		const green = pixels[offset + 1] ?? 0;
+  		const blue = pixels[offset + 2] ?? 0;
+  		luminance[index] = (red * 299 + green * 587 + blue * 114) / 1e3;
+  	}
+  }
   /**
   * Places the capture instant on the shared clock, or says it is unknown.
   *
@@ -2151,6 +2945,76 @@
   	const parsed = positive(value);
   	return parsed === void 0 ? void 0 : Math.round(parsed);
   }
+  /** Where Camera Source publishes its calibration capability. */
+  var cameraSourceCalibrationKey = "kubohiroyaCameraSourceCapability";
+  var CAMERA_SOURCE_CALIBRATION_VERSION = 1;
+  /**
+  * Camera Source's calibration surface, or undefined when it is not published.
+  *
+  * It is absent whenever Camera Source was loaded without its calibration flag,
+  * which is an ordinary configuration and not a fault.
+  */
+  function readCameraCalibration(runtime) {
+  	if (typeof runtime !== "object" || runtime === null) return void 0;
+  	const candidate = runtime[cameraSourceCalibrationKey];
+  	if (typeof candidate !== "object" || candidate === null) return void 0;
+  	const requireVersion = candidate.requireVersion;
+  	if (typeof requireVersion !== "function") return void 0;
+  	let capability;
+  	try {
+  		capability = requireVersion.call(candidate, CAMERA_SOURCE_CALIBRATION_VERSION);
+  	} catch {
+  		return;
+  	}
+  	if (typeof capability !== "object" || capability === null) return void 0;
+  	const { profileFor, intrinsicsFor } = capability;
+  	if (typeof profileFor !== "function" || typeof intrinsicsFor !== "function") return void 0;
+  	return {
+  		profileFor: (cameraId) => readProfileSummary(profileFor.call(capability, cameraId)),
+  		intrinsicsFor: (cameraId) => readUsableIntrinsics(intrinsicsFor.call(capability, cameraId))
+  	};
+  }
+  function readProfileSummary(value) {
+  	if (typeof value !== "object" || value === null) return void 0;
+  	const { profileId, distortion } = value;
+  	if (typeof profileId !== "string" || profileId.length === 0) return void 0;
+  	if (typeof distortion !== "object" || distortion === null) return void 0;
+  	const { model, coefficients } = distortion;
+  	if (typeof model !== "string" || !Array.isArray(coefficients)) return void 0;
+  	if (!coefficients.every((entry) => typeof entry === "number" && Number.isFinite(entry))) return;
+  	return {
+  		profileId,
+  		distortion: {
+  			model,
+  			coefficients: [...coefficients]
+  		}
+  	};
+  }
+  function readUsableIntrinsics(value) {
+  	if (typeof value !== "object" || value === null) return void 0;
+  	const record = value;
+  	const numbers = [
+  		"fx",
+  		"fy",
+  		"cx",
+  		"cy",
+  		"skew",
+  		"width",
+  		"height"
+  	].map((key) => record[key]);
+  	if (!numbers.every((entry) => typeof entry === "number" && Number.isFinite(entry))) return;
+  	const [fx, fy, cx, cy, skew, width, height] = numbers;
+  	if (!(fx > 0) || !(fy > 0) || !(width > 0) || !(height > 0)) return;
+  	return {
+  		fx,
+  		fy,
+  		cx,
+  		cy,
+  		skew,
+  		width,
+  		height
+  	};
+  }
   //#endregion
   //#region src/optical-time/controller.ts
   var DEFAULT_ANALYSIS_WIDTH = 240;
@@ -2185,6 +3049,7 @@
   	constructor(options) {
   		this.observations = [];
   		this.recentDecodes = [];
+  		this.frameListeners = /* @__PURE__ */ new Set();
   		this.rects = [];
   		this.pipelineState = "idle";
   		this.code = "";
@@ -2226,6 +3091,33 @@
   	}
   	cameraId() {
   		return this.start_?.cameraId ?? "";
+  	}
+  	referenceId() {
+  		return this.start_?.referenceId ?? "";
+  	}
+  	patternProfile() {
+  		return this.profile;
+  	}
+  	/** The panel square found by calibration, or undefined unless the decoder is ready. */
+  	panelQuad() {
+  		return this.pipelineState === "ready" ? this.quad : void 0;
+  	}
+  	/** The video element frames are drawn from, while a camera is held. */
+  	frameElement() {
+  		return this.lease?.getFrameSource().element;
+  	}
+  	/**
+  	* Follows the running decoder frame by frame.
+  	*
+  	* Refused unless the decoder is ready: before then there is no calibrated
+  	* panel for a follower to rely on. Returns the function that stops following.
+  	*/
+  	observeFrames(listener) {
+  		if (this.pipelineState !== "ready" || !this.quad) throw new TimeSpaceSyncError("decoder-not-running", "The optical time decoder must be running and calibrated first.");
+  		this.frameListeners.add(listener);
+  		return () => {
+  			this.frameListeners.delete(listener);
+  		};
   	}
   	decodeRate() {
   		if (this.recentDecodes.length === 0) return 0;
@@ -2296,6 +3188,7 @@
   	}
   	async stop() {
   		this.operation += 1;
+  		this.endFrameListeners("Optical time decoding stopped.");
   		const calibration = this.calibration;
   		if (calibration) {
   			calibration.cancelled = true;
@@ -2330,6 +3223,7 @@
   	}
   	async runCalibration(seconds, token) {
   		this.requireCalibrationSeconds(seconds);
+  		this.endFrameListeners("The optical time decoder started calibrating again.");
   		this.pipelineState = "calibrating";
   		this.code = "";
   		this.message = "";
@@ -2385,6 +3279,7 @@
   			}
   			this.pipelineState = "error";
   			this.message = error instanceof Error ? error.message : String(error);
+  			this.endFrameListeners(this.message);
   		}
   	}
   	consumeFrame(frame) {
@@ -2400,19 +3295,49 @@
   		const samples = this.sample(frame.luminance);
   		if (!samples) {
   			this.recordDecodeAttempt(false);
+  			this.notifyFrame(frame, "no-reading");
   			return;
   		}
   		const code = levels.decode(samples);
   		this.lastDecodeMargin = levels.decodeMargin(samples);
   		this.recordDecodeAttempt(code !== void 0);
-  		if (code === void 0) return;
-  		if (!this.passesContinuity(code, frame)) {
+  		if (code === void 0) {
+  			this.notifyFrame(frame, "no-reading");
+  			return;
+  		}
+  		const continuity = this.continuityOf(code, frame);
+  		if (continuity === "discontinuous") {
   			this.rejectedObservations += 1;
+  			this.notifyFrame(frame, continuity);
   			return;
   		}
   		levels.track(samples);
   		this.observations.push(this.observationFor(code, frame, start, levels, samples));
   		this.expire();
+  		this.notifyFrame(frame, continuity);
+  	}
+  	notifyFrame(frame, continuity) {
+  		const quad = this.quad;
+  		if (!quad || this.frameListeners.size === 0) return;
+  		const event = {
+  			frame,
+  			quad,
+  			analysisWidth: this.analysisWidth,
+  			analysisHeight: this.analysisHeight,
+  			continuity
+  		};
+  		for (const listener of [...this.frameListeners]) try {
+  			listener.frame(event);
+  		} catch {}
+  	}
+  	endFrameListeners(message) {
+  		if (this.frameListeners.size === 0) return;
+  		const listeners = [...this.frameListeners];
+  		this.frameListeners.clear();
+  		const error = new TimeSpaceSyncError("decoder-not-running", message);
+  		for (const listener of listeners) try {
+  			listener.ended(error);
+  		} catch {}
   	}
   	/**
   	* Rejects a decode that cannot follow the previous one in real time.
@@ -2423,22 +3348,22 @@
   	* time on this computer's own clock catches both, and needs no agreement with
   	* any other clock to do it.
   	*/
-  	passesContinuity(code, frame) {
+  	continuityOf(code, frame) {
   		const previous = this.lastDecode;
   		this.lastDecode = {
   			code,
   			monotonicAtUs: frame.monotonicAtUs
   		};
-  		if (!previous) return true;
+  		if (!previous) return "first-reading";
   		const elapsedUs = frame.monotonicAtUs - previous.monotonicAtUs;
-  		if (elapsedUs <= 0) return true;
+  		if (elapsedUs <= 0) return "first-reading";
   		const wrap = wrapUs(this.profile);
-  		if (elapsedUs >= wrap / 2) return true;
+  		if (elapsedUs >= wrap / 2) return "first-reading";
   		const advanced = patternTimestampUs(code, this.profile) - patternTimestampUs(previous.code, this.profile);
   		const half = wrap / 2;
   		const signed = ((advanced + half) % wrap + wrap) % wrap - half;
   		const allowance = (this.start_?.displayRefreshUs ?? 0) + (this.start_?.refreshUncertaintyUs ?? 0);
-  		return Math.abs(signed - elapsedUs) <= allowance;
+  		return Math.abs(signed - elapsedUs) <= allowance ? "continuous" : "discontinuous";
   	}
   	observationFor(code, frame, start, levels, samples) {
   		const panel = this.panelRect();
@@ -2597,6 +3522,7 @@
   		this.pipelineState = "error";
   		this.code = code;
   		this.message = error instanceof Error ? error.message : String(error);
+  		this.endFrameListeners(this.message);
   		this.pump?.stop();
   		this.pump = void 0;
   		const lease = this.lease;
@@ -2621,6 +3547,228 @@
   function defaultWait(milliseconds) {
   	return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
+  /**
+  * Largest RMS distance of per-frame corners from the aggregate, in pixels.
+  *
+  * The placement solve assumes a corner is placed to about half a pixel
+  * (DEFAULT_IMAGE_SIGMA_PX). Per-frame corners from a steady camera scatter by
+  * well under that. A spread beyond it means the corners moved during the
+  * window -- the camera was knocked, the projector is vibrating, auto-focus was
+  * hunting -- and the median is then an average of two places, not either of
+  * them.
+  */
+  var MAXIMUM_CORNER_SPREAD_PX = .5;
+  /** How long past the window to wait for a frame before calling the camera stopped. */
+  var WATCHDOG_GRACE_MS = 2e3;
+  function measurePatternCorners(options) {
+  	let settle = () => void 0;
+  	const result = new Promise((resolve) => {
+  		settle = resolve;
+  	});
+  	let settled = false;
+  	let unsubscribe;
+  	let reader;
+  	let disarm;
+  	const finish = (outcome) => {
+  		if (settled) return;
+  		settled = true;
+  		unsubscribe?.();
+  		unsubscribe = void 0;
+  		disarm?.();
+  		disarm = void 0;
+  		reader?.dispose();
+  		reader = void 0;
+  		settle(outcome);
+  	};
+  	const fail = (code, message, spreadPx) => {
+  		finish(spreadPx === void 0 ? {
+  			ok: false,
+  			code,
+  			message
+  		} : {
+  			ok: false,
+  			code,
+  			message,
+  			spreadPx
+  		});
+  	};
+  	const running = {
+  		result,
+  		cancel: fail
+  	};
+  	const seconds = options.seconds;
+  	if (!Number.isFinite(seconds) || seconds < 1 || seconds > 60) {
+  		fail("invalid-duration", `Corner measurement must run between 1 and 60 seconds.`);
+  		return running;
+  	}
+  	if (options.profile.fiducials.length === 0) {
+  		fail("profile-without-fiducials", `Pattern profile ${options.profile.id} has no corner fiducials to measure.`);
+  		return running;
+  	}
+  	const deadlineUs = options.clock.nowUs() + seconds * 1e6;
+  	const samples = [];
+  	const failures = /* @__PURE__ */ new Map();
+  	let rejected = 0;
+  	let continuous = 0;
+  	let discontinuous = 0;
+  	let size;
+  	const listener = {
+  		frame: (event) => {
+  			if (settled) return;
+  			try {
+  				take(event);
+  			} catch (error) {
+  				fail(errorCodeOf(error), error instanceof Error ? error.message : String(error));
+  			}
+  		},
+  		ended: (error) => fail(error.code, error.message)
+  	};
+  	const take = (event) => {
+  		const { frame } = event;
+  		if (event.continuity === "continuous") continuous += 1;
+  		if (event.continuity === "discontinuous") discontinuous += 1;
+  		const source = {
+  			width: frame.sourceWidth,
+  			height: frame.sourceHeight
+  		};
+  		if (!size) size = source;
+  		if (size.width !== source.width || size.height !== source.height) throw new TimeSpaceSyncError("frame-size-mismatch", `The camera changed from ${size.width}x${size.height} to ${source.width}x${source.height} while the corners were being measured.`);
+  		const analysis = {
+  			width: event.analysisWidth,
+  			height: event.analysisHeight
+  		};
+  		const quad = sourceQuadFromAnalysis(event.quad, analysis, source);
+  		const scale = Math.max(source.width / analysis.width, source.height / analysis.height);
+  		reader ?? (reader = options.createReader());
+  		const refined = refinePanelCorners(reader, quad, options.profile, source, 2 * scale);
+  		if (refined.ok) samples.push({
+  			corners: refined.corners,
+  			deliveredAtUs: frame.deliveredAtUs
+  		});
+  		else {
+  			rejected += 1;
+  			failures.set(refined.reason, (failures.get(refined.reason) ?? 0) + 1);
+  		}
+  		if (options.clock.nowUs() >= deadlineUs) conclude();
+  	};
+  	const conclude = () => {
+  		if (samples.length < 15 || !size) {
+  			fail("too-few-corner-frames", `Only ${samples.length} frames gave all four corners; 15 are needed.${describeFailures(failures)}`);
+  			return;
+  		}
+  		if (continuous < 3 || continuous < discontinuous) {
+  			fail("orientation-unproven", `Only ${continuous} readings advanced with real time against ${discontinuous} that did not, so the panel may be seen turned over and its corners cannot be named.`);
+  			return;
+  		}
+  		const corners = [
+  			0,
+  			1,
+  			2,
+  			3
+  		].map((index) => ({
+  			x: median(samples.map((sample) => sample.corners[index].x)),
+  			y: median(samples.map((sample) => sample.corners[index].y))
+  		}));
+  		let squares = 0;
+  		for (const sample of samples) sample.corners.forEach((point, index) => {
+  			const aggregate = corners[index];
+  			squares += (point.x - aggregate.x) ** 2 + (point.y - aggregate.y) ** 2;
+  		});
+  		const spreadPx = Math.sqrt(squares / (samples.length * 4));
+  		if (spreadPx > .5) {
+  			fail("corners-unstable", `The corners moved by ${spreadPx.toFixed(2)} px RMS during the measurement; at most ${MAXIMUM_CORNER_SPREAD_PX} px is accepted.`, spreadPx);
+  			return;
+  		}
+  		const delivered = samples.map((sample) => sample.deliveredAtUs).sort((a, b) => a - b);
+  		finish({
+  			ok: true,
+  			measurement: {
+  				corners,
+  				spreadPx,
+  				frameCount: samples.length,
+  				rejectedFrameCount: rejected,
+  				capturedAtUs: delivered[Math.floor((delivered.length - 1) / 2)],
+  				sourceWidth: size.width,
+  				sourceHeight: size.height
+  			}
+  		});
+  	};
+  	try {
+  		unsubscribe = options.source.observeFrames(listener);
+  	} catch (error) {
+  		fail(errorCodeOf(error), error instanceof Error ? error.message : String(error));
+  		return running;
+  	}
+  	disarm = (options.schedule ?? defaultSchedule)(() => {
+  		fail("camera-ended", "The camera stopped delivering frames while the corners were being measured.");
+  	}, seconds * 1e3 + WATCHDOG_GRACE_MS);
+  	if (settled) {
+  		disarm();
+  		disarm = void 0;
+  	}
+  	return running;
+  }
+  function describeFailures(failures) {
+  	if (failures.size === 0) return "";
+  	const worst = [...failures.entries()].sort((left, right) => right[1] - left[1])[0];
+  	return worst ? ` The most common refusal was ${worst[0]} (${worst[1]} frames).` : "";
+  }
+  function median(values) {
+  	const sorted = [...values].sort((left, right) => left - right);
+  	const middle = Math.floor(sorted.length / 2);
+  	return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+  function defaultSchedule(callback, milliseconds) {
+  	const handle = setTimeout(callback, milliseconds);
+  	return () => clearTimeout(handle);
+  }
+  //#endregion
+  //#region src/optical-time/region-reader.ts
+  /**
+  * Reads small windows of the video at its own resolution.
+  *
+  * Each window is drawn with a source rectangle into a canvas no larger than the
+  * window, so only those pixels are ever read back. The frame pump draws the
+  * whole frame, but downscaled; reading the full frame at full size to cut four
+  * corners out of it would cost more than the decoder does.
+  */
+  var VideoRegionReader = class {
+  	constructor(options) {
+  		this.element = options.element;
+  		const canvas = (options.documentRef ?? document).createElement("canvas");
+  		const context = canvas.getContext("2d", { willReadFrequently: true });
+  		if (!context) throw new Error("Measuring the pattern corners needs a 2D canvas.");
+  		this.canvas = canvas;
+  		this.context = context;
+  	}
+  	read(region) {
+  		const canvas = this.canvas;
+  		const context = this.context;
+  		if (!canvas || !context) return void 0;
+  		const { x, y, width, height } = region;
+  		if (width < 1 || height < 1) return void 0;
+  		if (canvas.width < width) canvas.width = width;
+  		if (canvas.height < height) canvas.height = height;
+  		context.drawImage(this.element, x, y, width, height, 0, 0, width, height);
+  		const pixels = context.getImageData(0, 0, width, height).data;
+  		const data = new Uint8Array(width * height);
+  		luminanceFromRgba(pixels, data);
+  		return {
+  			width,
+  			height,
+  			data
+  		};
+  	}
+  	/** Releases the canvas's backing store, which otherwise lives as long as the object. */
+  	dispose() {
+  		if (this.canvas) {
+  			this.canvas.width = 0;
+  			this.canvas.height = 0;
+  		}
+  		this.canvas = void 0;
+  		this.context = void 0;
+  	}
+  };
   //#endregion
   //#region src/optical-time/estimator.ts
   var DEFAULT_VALIDITY_US = 3e7;
@@ -3014,6 +4162,88 @@
   		if (dx * dx + dy * dy < UNDISTORT_TOLERANCE) break;
   	}
   	return current;
+  }
+  /**
+  * Reads a camera model document, refusing anything that does not state its lens fully.
+  *
+  * The accepted shape is `{intrinsics: {fx, fy, cx, cy, skew}, distortion:
+  * {model, coefficients}}`, optionally with `intrinsicProfileId`, `imageWidth`
+  * and `imageHeight`; the pattern corner blocks produce exactly that.
+  *
+  * Camera Source's `camera intrinsics JSON` is refused with
+  * `unsupported-distortion-model`. It carries the pinhole numbers adapted to the
+  * frame but no distortion, and reading its absence as "no distortion" would
+  * move every pose solved through a webcam lens while the residual stayed small.
+  * The distortion is in the profile Camera Source holds, so the model is built
+  * on the camera's own computer, where both are available.
+  */
+  function parseCameraModel(value) {
+  	if (typeof value !== "object" || value === null) return {
+  		ok: false,
+  		code: "invalid-payload",
+  		message: "A camera model must be a JSON object."
+  	};
+  	const record = value;
+  	if (record.intrinsics === void 0 && typeof record.fx === "number") return {
+  		ok: false,
+  		code: "unsupported-distortion-model",
+  		message: "These intrinsics state no distortion model. Use the camera model JSON block on the camera computer, which adds the distortion from the registered profile."
+  	};
+  	const intrinsics = record.intrinsics;
+  	if (typeof intrinsics !== "object" || intrinsics === null || ![
+  		"fx",
+  		"fy",
+  		"cx",
+  		"cy",
+  		"skew"
+  	].every((key) => typeof intrinsics[key] === "number" && Number.isFinite(intrinsics[key])) || !(intrinsics.fx > 0) || !(intrinsics.fy > 0)) return {
+  		ok: false,
+  		code: "invalid-payload",
+  		message: "The intrinsics need finite fx, fy, cx, cy and skew."
+  	};
+  	const distortion = record.distortion;
+  	if (typeof distortion !== "object" || distortion === null || typeof distortion.model !== "string") return {
+  		ok: false,
+  		code: "unsupported-distortion-model",
+  		message: "The camera model states no distortion model."
+  	};
+  	const coefficients = distortion.coefficients;
+  	if (!Array.isArray(coefficients) || !coefficients.every((entry) => typeof entry === "number" && Number.isFinite(entry))) return {
+  		ok: false,
+  		code: "invalid-payload",
+  		message: "Distortion coefficients must be finite numbers."
+  	};
+  	const profileId = record.intrinsicProfileId;
+  	if (profileId !== void 0 && (typeof profileId !== "string" || profileId.length === 0)) return {
+  		ok: false,
+  		code: "invalid-payload",
+  		message: "intrinsicProfileId must be a non-empty string."
+  	};
+  	for (const key of ["imageWidth", "imageHeight"]) {
+  		const size = record[key];
+  		if (size !== void 0 && !(Number.isInteger(size) && size > 0)) return {
+  			ok: false,
+  			code: "invalid-payload",
+  			message: `${key} must be a positive integer.`
+  		};
+  	}
+  	return {
+  		ok: true,
+  		intrinsics: {
+  			fx: intrinsics.fx,
+  			fy: intrinsics.fy,
+  			cx: intrinsics.cx,
+  			cy: intrinsics.cy,
+  			skew: intrinsics.skew
+  		},
+  		distortion: {
+  			model: distortion.model,
+  			coefficients: [...coefficients]
+  		},
+  		...profileId === void 0 ? {} : { intrinsicProfileId: profileId },
+  		...record.imageWidth === void 0 ? {} : { imageWidth: record.imageWidth },
+  		...record.imageHeight === void 0 ? {} : { imageHeight: record.imageHeight }
+  	};
   }
   //#endregion
   //#region src/placement/reference.ts
@@ -3654,6 +4884,16 @@
   			message: `No camera model was supplied for ${observation.cameraId}.`
   		};
   		requireSupportedDistortion(model.distortion);
+  		if (model.intrinsicProfileId !== void 0 && model.intrinsicProfileId !== observation.intrinsicProfileId) return {
+  			ok: false,
+  			code: "intrinsic-profile-mismatch",
+  			message: `Camera ${observation.cameraId} was observed through profile ${observation.intrinsicProfileId} but its model comes from ${model.intrinsicProfileId}.`
+  		};
+  		if (model.imageWidth !== void 0 && model.imageWidth !== observation.imageWidth || model.imageHeight !== void 0 && model.imageHeight !== observation.imageHeight) return {
+  			ok: false,
+  			code: "intrinsic-profile-mismatch",
+  			message: `Camera ${observation.cameraId} was observed at ${observation.imageWidth}x${observation.imageHeight} but its model describes ${model.imageWidth}x${model.imageHeight}.`
+  		};
   		const paired = pairPoints(observation, byId, reference);
   		if (!paired) return {
   			ok: false,
@@ -3673,7 +4913,7 @@
   		};
   		const sigma = poseUncertainty(solution.best, paired.planar, paired.image, model.intrinsics, model.distortion, options.imageSigmaPx);
   		const scaleShare = reference.extentMeters > 0 ? reference.sigmaMeters / reference.extentMeters * Math.hypot(...solution.best.translation) : 0;
-  		const cameraFromReference = rigidFromPose(solution.best);
+  		const cameraFromReference = composeRigidTransforms(rigidFromPose(solution.best), planarFromReference(reference));
   		poses.set(observation.cameraId, cameraFromReference);
   		cameras.push({
   			cameraId: observation.cameraId,
@@ -3749,6 +4989,40 @@
   	};
   }
   /**
+  * The rigid map from reference coordinates into the plane's own basis.
+  *
+  * A planar pose treats the plane as z = 0 with its third axis the cross product
+  * of the two in-plane axes. The fitted plane normal is only known up to sign, so
+  * it is not used here: taking it as found would make the map a reflection for
+  * half of all references, and a reflected pose still reprojects perfectly.
+  */
+  function planarFromReference(reference) {
+  	const u = reference.axisU;
+  	const v = reference.axisV;
+  	const rows = [
+  		u,
+  		v,
+  		[
+  			(u[1] ?? 0) * (v[2] ?? 0) - (u[2] ?? 0) * (v[1] ?? 0),
+  			(u[2] ?? 0) * (v[0] ?? 0) - (u[0] ?? 0) * (v[2] ?? 0),
+  			(u[0] ?? 0) * (v[1] ?? 0) - (u[1] ?? 0) * (v[0] ?? 0)
+  		]
+  	];
+  	const o = reference.origin;
+  	return [
+  		...rows.flatMap((row) => [
+  			row[0] ?? 0,
+  			row[1] ?? 0,
+  			row[2] ?? 0,
+  			-((row[0] ?? 0) * (o[0] ?? 0) + (row[1] ?? 0) * (o[1] ?? 0) + (row[2] ?? 0) * (o[2] ?? 0))
+  		]),
+  		0,
+  		0,
+  		0,
+  		1
+  	];
+  }
+  /**
   * Matches marked image points to measured reference points by name.
   *
   * Only the points both sides name are used. A mark whose name is not in the
@@ -3790,6 +5064,178 @@
   	return Number.isFinite(value) ? Number(value.toFixed(6)) : 0;
   }
   //#endregion
+  //#region src/placement/pattern-reference.ts
+  /**
+  * The reference a projected time pattern provides, from four tape measurements.
+  *
+  * The pattern's outer corners are what `measurePatternCorners` finds in each
+  * camera, and they are named the same way here: `tl`, `tr`, `br`, `bl`, the
+  * outer corners of the four lit corner cells in the orientation the pattern is
+  * drawn. They are listed individually because a projection onto a wall is a
+  * general quadrilateral; see ReferenceDefinition.
+  */
+  var PATTERN_REFERENCE_POINT_IDS = [
+  	"tl",
+  	"tr",
+  	"br",
+  	"bl"
+  ];
+  /**
+  * Builds and validates the reference, or returns undefined.
+  *
+  * The wall is the plane z = 0 and the two in-plane axes are the operator's
+  * choice -- x right and y up, or y down -- as long as they are at right angles
+  * and in metres. Both choices describe the same physical corners; the solve
+  * works in the plane's own basis and reports poses in whichever was given.
+  *
+  * Refused rather than repaired: four corners that are not numbers, do not form
+  * a simple convex outline, or fail the placement-reference contract give
+  * undefined. A reference quietly completed from a malformed measurement is a
+  * wrong scale that nothing downstream can detect.
+  */
+  function buildPatternReference(input) {
+  	const corners = parseCorners(input.corners);
+  	if (!corners || !isConvexQuadrilateral(corners)) return void 0;
+  	if (!Number.isFinite(input.sigmaMeters)) return void 0;
+  	const parsed = parseReferenceDefinition({
+  		schema: PLACEMENT_REFERENCE_SCHEMA,
+  		version: 1,
+  		referenceId: input.referenceId.trim(),
+  		kind: "projection",
+  		points: corners.map((corner, index) => ({
+  			id: PATTERN_REFERENCE_POINT_IDS[index],
+  			x: corner.x,
+  			y: corner.y,
+  			z: 0,
+  			sigmaMeters: input.sigmaMeters
+  		})),
+  		planarityResidualMeters: 0,
+  		rectangularityResidualMeters: roundMeters(rectangularityResidual(corners)),
+  		measuredBy: input.measuredBy.trim(),
+  		notes: ["Outer corners of the lit corner cells of the projected time pattern, named in the orientation it is drawn."]
+  	});
+  	return parsed.ok ? parsed.value : void 0;
+  }
+  function parseCorners(text) {
+  	const parts = text.split(";");
+  	if (parts.length !== 4) return void 0;
+  	const corners = [];
+  	for (const part of parts) {
+  		const values = part.split(",");
+  		if (values.length !== 2) return void 0;
+  		const [x, y] = values.map((value) => value.trim() === "" ? NaN : Number(value));
+  		if (!Number.isFinite(x) || !Number.isFinite(y)) return void 0;
+  		corners.push({
+  			x,
+  			y
+  		});
+  	}
+  	return corners;
+  }
+  /**
+  * Whether the corners, in the order given, trace a simple convex outline.
+  *
+  * Every turn has the same sense and none is straight. A crossed order -- two
+  * corners swapped -- turns both ways, and a solve against it would fit a pose
+  * to corners that were never where they are said to be.
+  */
+  function isConvexQuadrilateral(corners) {
+  	let sign = 0;
+  	for (let index = 0; index < 4; index += 1) {
+  		const a = corners[index];
+  		const b = corners[(index + 1) % 4];
+  		const c = corners[(index + 2) % 4];
+  		const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+  		if (!(Math.abs(cross) > 0)) return false;
+  		const turn = Math.sign(cross);
+  		if (sign === 0) sign = turn;
+  		else if (turn !== sign) return false;
+  	}
+  	return true;
+  }
+  /**
+  * How far the outline departs from a rectangle, in metres.
+  *
+  * The largest distance from a measured corner to the matching corner of the
+  * rectangle that fits all four best in the least squares sense, with its
+  * centre, rotation, width and height all free. It is zero exactly when the
+  * corners form a rectangle, it is in the same units as the tape, and it does
+  * not depend on where the axes were put. A diagonal difference, the obvious
+  * alternative, is zero for any isosceles trapezoid, which is the shape a
+  * projector tilted up at a wall throws.
+  *
+  * The fit has a closed form. With the centroid removed, the corners are
+  * compared with `±w/2 e1 ± h/2 e2`, signs fixed by the corner names. For a
+  * given direction e1 the best width and height are projections, and the
+  * direction that leaves least error is the principal eigenvector of a 2x2
+  * matrix built from two sign-weighted sums of the corners.
+  */
+  function rectangularityResidual(corners) {
+  	const centre = {
+  		x: corners.reduce((total, corner) => total + corner.x, 0) / 4,
+  		y: corners.reduce((total, corner) => total + corner.y, 0) / 4
+  	};
+  	const q = corners.map((corner) => ({
+  		x: corner.x - centre.x,
+  		y: corner.y - centre.y
+  	}));
+  	const signs = [
+  		[-1, -1],
+  		[1, -1],
+  		[1, 1],
+  		[-1, 1]
+  	];
+  	let X = {
+  		x: 0,
+  		y: 0
+  	};
+  	let Y = {
+  		x: 0,
+  		y: 0
+  	};
+  	q.forEach((point, index) => {
+  		const [sx, sy] = signs[index];
+  		X = {
+  			x: X.x + sx * point.x,
+  			y: X.y + sx * point.y
+  		};
+  		Y = {
+  			x: Y.x + sy * point.x,
+  			y: Y.y + sy * point.y
+  		};
+  	});
+  	const Z = {
+  		x: Y.y,
+  		y: -Y.x
+  	};
+  	const m00 = X.x * X.x + Z.x * Z.x;
+  	const m01 = X.x * X.y + Z.x * Z.y;
+  	const m11 = X.y * X.y + Z.y * Z.y;
+  	const angle = .5 * Math.atan2(2 * m01, m00 - m11);
+  	const e1 = {
+  		x: Math.cos(angle),
+  		y: Math.sin(angle)
+  	};
+  	const e2 = {
+  		x: -e1.y,
+  		y: e1.x
+  	};
+  	const halfWidth = (X.x * e1.x + X.y * e1.y) / 4;
+  	const halfHeight = (Y.x * e2.x + Y.y * e2.y) / 4;
+  	let worst = 0;
+  	q.forEach((point, index) => {
+  		const [sx, sy] = signs[index];
+  		const fitX = sx * halfWidth * e1.x + sy * halfHeight * e2.x;
+  		const fitY = sx * halfWidth * e1.y + sy * halfHeight * e2.y;
+  		worst = Math.max(worst, Math.hypot(point.x - fitX, point.y - fitY));
+  	});
+  	return worst;
+  }
+  /** A micrometre: well below what a tape can resolve, and stable across machines. */
+  function roundMeters(value) {
+  	return Number(value.toFixed(6));
+  }
+  //#endregion
   //#region src/runtime-capability.ts
   var runtimeCapabilityKey = "kubohiroyaTimeSpaceSyncCapability";
   function createRuntimeCapability(host) {
@@ -3818,8 +5264,19 @@
   var blockDefinitions = block_definitions_default.blocks;
   var ANALYSIS_WIDTH = 240;
   var ANALYSIS_HEIGHT = 180;
+  /**
+  * The profiles a project may choose between, by the id each one publishes.
+  *
+  * Listed explicitly rather than accepting a profile document: a display and a
+  * decoder on different computers only agree if both chose from the same fixed
+  * set, and an id is what travels in every observation.
+  */
+  var PATTERN_PROFILES = new Map([PATTERN_PROFILE_V1, PATTERN_PROFILE_V2].map((profile) => [profile.id, profile]));
   var TimeSpaceSyncExtension = class {
   	constructor(options = {}) {
+  		this.profileErrorCode = "";
+  		this.cornerErrorCode = "";
+  		this.cornerSpread = 0;
   		this.correspondenceError = "";
   		this.placementObservations = [];
   		this.cameraModels = /* @__PURE__ */ new Map();
@@ -3827,10 +5284,16 @@
   		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
   		this.opticalTimeEnabled = options.opticalTimeEnabled ?? featureFlags.opticalTimeSyncV1;
   		this.placementEnabled = options.placementEnabled ?? featureFlags.placementSolveV1;
-  		this.profile = options.profile ?? PATTERN_PROFILE_V1;
+  		this.defaultProfile = options.profile ?? PATTERN_PROFILE_V1;
+  		this.profile = this.defaultProfile;
   		this.clock = options.clock ?? new SessionClock(new LocalMonotonicClock());
   		this.display = options.display;
   		this.controller = options.controller;
+  		this.injectedDisplay = options.display !== void 0;
+  		this.injectedController = options.controller !== void 0;
+  		this.createFramePump = options.createFramePump;
+  		this.createRegionReader = options.createRegionReader;
+  		this.schedule = options.schedule;
   		this.publishCapability();
   		this.watchRuntime();
   	}
@@ -3872,6 +5335,33 @@
   	timePatternProfileId() {
   		return this.profile.id;
   	}
+  	/**
+  	* Chooses the pattern the display draws and the decoder reads.
+  	*
+  	* Only before either exists. A display already drawing one pattern, or a
+  	* decoder already calibrated against it, would otherwise carry on with the
+  	* old one while the reporter named the new one -- and a display and decoder
+  	* on different profiles decode nothing, with no error to say why. A refusal
+  	* changes nothing and leaves its reason in `time pattern profile error`.
+  	*/
+  	setTimePatternProfile(args) {
+  		this.requireOpticalTime();
+  		const id = Scratch.Cast.toString(args.PROFILE_ID).trim();
+  		const profile = PATTERN_PROFILES.get(id);
+  		if (!profile) {
+  			this.profileErrorCode = "unknown-pattern-profile";
+  			return;
+  		}
+  		if ([this.display?.patternProfile(), this.controller?.patternProfile()].find((existing) => existing !== void 0 && existing.id !== profile.id)) {
+  			this.profileErrorCode = "pattern-profile-in-use";
+  			return;
+  		}
+  		this.profile = profile;
+  		this.profileErrorCode = "";
+  	}
+  	timePatternProfileError() {
+  		return this.profileErrorCode;
+  	}
   	async startOpticalTimeDecoder(args) {
   		this.requireOpticalTime();
   		await this.requireController().start({
@@ -3887,6 +5377,7 @@
   		await this.requireController().recalibrate(Scratch.Cast.toNumber(args.SECONDS));
   	}
   	async stopOpticalTimeDecoder() {
+  		this.cancelCornerMeasurement("The optical time decoder was stopped.");
   		await this.controller?.stop();
   		this.observation = void 0;
   	}
@@ -3981,13 +5472,182 @@
   	setCameraModel(args) {
   		this.requirePlacement();
   		const cameraId = Scratch.Cast.toString(args.CAMERA_ID).trim();
-  		const model = readJson(args.MODEL_JSON);
-  		if (!cameraId || !model || typeof model.intrinsics !== "object") {
+  		if (!cameraId) {
   			this.placementErrorCode = "invalid-payload";
+  			return;
+  		}
+  		const parsed = parseCameraModel(readJson(args.MODEL_JSON));
+  		if (!parsed.ok) {
+  			this.placementErrorCode = parsed.code;
+  			return;
+  		}
+  		const model = {
+  			intrinsics: parsed.intrinsics,
+  			distortion: parsed.distortion,
+  			...parsed.intrinsicProfileId === void 0 ? {} : { intrinsicProfileId: parsed.intrinsicProfileId },
+  			...parsed.imageWidth === void 0 ? {} : { imageWidth: parsed.imageWidth },
+  			...parsed.imageHeight === void 0 ? {} : { imageHeight: parsed.imageHeight }
+  		};
+  		try {
+  			requireSupportedDistortion(model.distortion);
+  		} catch (error) {
+  			this.placementErrorCode = errorCodeOf(error);
   			return;
   		}
   		this.cameraModels.set(cameraId, model);
   		this.placementErrorCode = "";
+  	}
+  	/**
+  	* The camera model for `set camera model`, built from Camera Source's calibration.
+  	*
+  	* Camera Source's own `camera intrinsics JSON` gives the pinhole numbers
+  	* adapted to the current frame but leaves the distortion in the profile, so
+  	* the two are joined here, on the computer that holds both, along with the
+  	* profile id and frame size a solve checks observations against. Empty when
+  	* Camera Source publishes no calibration, has no profile for the camera, or
+  	* cannot adapt it to the frame being delivered.
+  	*/
+  	cameraModelJson(args) {
+  		const cameraId = Scratch.Cast.toString(args.CAMERA_ID).trim();
+  		const calibration = readCameraCalibration(this.runtime);
+  		const profile = calibration?.profileFor(cameraId);
+  		const intrinsics = calibration?.intrinsicsFor(cameraId);
+  		if (!profile || !intrinsics) return "";
+  		return JSON.stringify({
+  			intrinsics: {
+  				fx: intrinsics.fx,
+  				fy: intrinsics.fy,
+  				cx: intrinsics.cx,
+  				cy: intrinsics.cy,
+  				skew: intrinsics.skew
+  			},
+  			distortion: profile.distortion,
+  			intrinsicProfileId: profile.profileId,
+  			imageWidth: intrinsics.width,
+  			imageHeight: intrinsics.height
+  		});
+  	}
+  	/**
+  	* Measures the pattern's four outer corners in this camera's full-resolution image.
+  	*
+  	* Needs the decoder running on a profile with corner fiducials, and a
+  	* calibration profile for the camera in Camera Source: an observation is
+  	* useless to a solve without the lens it was seen through. Never throws for a
+  	* failed measurement; the reason is left in `pattern corner error`, and the
+  	* previous observation is cleared so a stale one cannot be sent on as fresh.
+  	*/
+  	async measurePatternCorners(args) {
+  		this.requirePlacement();
+  		this.cancelCornerMeasurement("A new corner measurement replaced this one.");
+  		this.cornerObservation = void 0;
+  		this.cornerSpread = 0;
+  		this.cornerErrorCode = "";
+  		const controller = this.controller;
+  		if (!controller || controller.state() !== "ready") {
+  			this.cornerErrorCode = "decoder-not-running";
+  			return;
+  		}
+  		const profile = controller.patternProfile();
+  		if (profile.fiducials.length === 0) {
+  			this.cornerErrorCode = "profile-without-fiducials";
+  			return;
+  		}
+  		const cameraId = controller.cameraId();
+  		const referenceId = controller.referenceId();
+  		const intrinsicProfile = readCameraCalibration(this.runtime)?.profileFor(cameraId);
+  		if (!intrinsicProfile) {
+  			this.cornerErrorCode = "intrinsic-profile-missing";
+  			return;
+  		}
+  		const element = controller.frameElement();
+  		const running = measurePatternCorners({
+  			source: controller,
+  			profile,
+  			seconds: Scratch.Cast.toNumber(args.SECONDS),
+  			clock: this.clock.monotonic(),
+  			createReader: () => this.createRegionReader ? this.createRegionReader(element) : new VideoRegionReader({ element: requireElement(element) }),
+  			...this.schedule ? { schedule: this.schedule } : {}
+  		});
+  		this.cornerMeasurement = running;
+  		const result = await running.result;
+  		if (this.cornerMeasurement !== running) return;
+  		this.cornerMeasurement = void 0;
+  		if (!result.ok) {
+  			this.cornerErrorCode = result.code;
+  			this.cornerSpread = result.spreadPx ?? 0;
+  			return;
+  		}
+  		const { measurement } = result;
+  		this.cornerSpread = roundPixels(measurement.spreadPx);
+  		const calibration = readCameraCalibration(this.runtime);
+  		const profileNow = calibration?.profileFor(cameraId);
+  		if (!profileNow) {
+  			this.cornerErrorCode = "intrinsic-profile-missing";
+  			return;
+  		}
+  		const intrinsics = calibration?.intrinsicsFor(cameraId);
+  		if (profileNow.profileId !== intrinsicProfile.profileId || !intrinsics || intrinsics.width !== measurement.sourceWidth || intrinsics.height !== measurement.sourceHeight) {
+  			this.cornerErrorCode = "intrinsic-profile-mismatch";
+  			return;
+  		}
+  		const conditions = element ? readCaptureConditions(element) : {};
+  		const parsed = parsePlacementObservation({
+  			schema: PLACEMENT_OBSERVATION_SCHEMA,
+  			version: 1,
+  			cameraId,
+  			referenceId,
+  			intrinsicProfileId: profileNow.profileId,
+  			imagePoints: measurement.corners.map((corner, index) => ({
+  				id: PATTERN_CORNER_IDS[index],
+  				u: roundPixels(corner.x),
+  				v: roundPixels(corner.y)
+  			})),
+  			imageWidth: measurement.sourceWidth,
+  			imageHeight: measurement.sourceHeight,
+  			capturedAtUs: measurement.capturedAtUs,
+  			conditions: {
+  				...conditions.frameRate === void 0 ? {} : { frameRate: conditions.frameRate },
+  				...conditions.exposureTimeUs === void 0 ? {} : { exposureTimeUs: conditions.exposureTimeUs }
+  			}
+  		});
+  		if (!parsed.ok) {
+  			this.cornerErrorCode = "invalid-payload";
+  			return;
+  		}
+  		this.cornerObservation = parsed.value;
+  	}
+  	patternCornerObservationJson() {
+  		return this.cornerObservation ? JSON.stringify(this.cornerObservation) : "";
+  	}
+  	patternCornerError() {
+  		return this.cornerErrorCode;
+  	}
+  	patternCornerSpreadPx() {
+  		return this.cornerSpread;
+  	}
+  	/**
+  	* The reference the pattern's corners are measured against, from a tape.
+  	*
+  	* Empty when any corner is not a number, the four do not trace a convex
+  	* outline in the order given, or the result would fail the contract.
+  	*/
+  	patternReferenceJson(args) {
+  		this.requirePlacement();
+  		const reference = buildPatternReference({
+  			referenceId: Scratch.Cast.toString(args.REFERENCE_ID),
+  			corners: Scratch.Cast.toString(args.CORNERS),
+  			sigmaMeters: readFiniteNumber(args.SIGMA_METERS),
+  			measuredBy: Scratch.Cast.toString(args.MEASURED_BY)
+  		});
+  		return reference ? JSON.stringify(reference) : "";
+  	}
+  	cancelCornerMeasurement(message) {
+  		const running = this.cornerMeasurement;
+  		if (!running) return;
+  		this.cornerMeasurement = void 0;
+  		running.cancel("decoder-not-running", message);
+  		this.cornerErrorCode = "decoder-not-running";
+  		this.cornerObservation = void 0;
   	}
   	solvePlacement(args) {
   		this.requirePlacement();
@@ -4068,20 +5728,26 @@
   		return this.display;
   	}
   	requireController() {
-  		if (!this.controller) this.controller = new OpticalTimeController({
-  			runtime: this.runtime,
-  			clock: this.clock,
-  			profile: this.profile,
-  			analysisWidth: ANALYSIS_WIDTH,
-  			analysisHeight: ANALYSIS_HEIGHT,
-  			createFramePump: (lease) => new VideoFramePump({
-  				element: lease.getFrameSource().element,
+  		if (!this.controller) {
+  			const size = {
   				width: ANALYSIS_WIDTH,
-  				height: ANALYSIS_HEIGHT,
+  				height: ANALYSIS_HEIGHT
+  			};
+  			this.controller = new OpticalTimeController({
+  				runtime: this.runtime,
   				clock: this.clock,
-  				monotonic: this.clock.monotonic()
-  			})
-  		});
+  				profile: this.profile,
+  				analysisWidth: ANALYSIS_WIDTH,
+  				analysisHeight: ANALYSIS_HEIGHT,
+  				createFramePump: (lease) => this.createFramePump ? this.createFramePump(lease, size) : new VideoFramePump({
+  					element: lease.getFrameSource().element,
+  					width: ANALYSIS_WIDTH,
+  					height: ANALYSIS_HEIGHT,
+  					clock: this.clock,
+  					monotonic: this.clock.monotonic()
+  				})
+  			});
+  		}
   		return this.controller;
   	}
   	publishCapability() {
@@ -4112,8 +5778,17 @@
   	*/
   	watchRuntime() {
   		const stop = () => {
+  			const measuring = this.cornerMeasurement !== void 0;
+  			this.cancelCornerMeasurement("The project stopped.");
+  			if (!measuring) this.cornerErrorCode = "";
+  			this.cornerObservation = void 0;
+  			this.cornerSpread = 0;
   			this.controller?.stop().catch(() => void 0);
   			this.display?.hide();
+  			if (!this.injectedController) this.controller = void 0;
+  			if (!this.injectedDisplay) this.display = void 0;
+  			this.profile = this.defaultProfile;
+  			this.profileErrorCode = "";
   			this.observation = void 0;
   			this.correspondence = void 0;
   			this.correspondenceError = "";
@@ -4138,6 +5813,19 @@
   		};
   	}
   };
+  function requireElement(element) {
+  	if (!element) throw new TimeSpaceSyncError("camera-unavailable", "The decoder holds no camera to read corners from.");
+  	return element;
+  }
+  /** Thousandths of a pixel: finer than any corner here is measured, and stable to print. */
+  function roundPixels(value) {
+  	return Math.round(value * 1e3) / 1e3;
+  }
+  /** A number from a block argument, or NaN for empty text rather than Scratch's zero. */
+  function readFiniteNumber(value) {
+  	const text = Scratch.Cast.toString(value).trim();
+  	return text === "" ? NaN : Number(text);
+  }
   /** Parses block text as JSON, treating anything unparseable as absent. */
   function readJson(value) {
   	try {

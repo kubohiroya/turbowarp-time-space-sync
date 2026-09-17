@@ -32,9 +32,18 @@ export const TIME_SPACE_SYNC_ERROR_CODES = [
   'degenerate-view',
   'insufficient-points',
   'verification-failed',
+  // Measuring the pattern's corners for placement.
+  'decoder-not-running',
+  'profile-without-fiducials',
+  'intrinsic-profile-missing',
+  'too-few-corner-frames',
+  'corners-unstable',
+  'orientation-unproven',
   // Display.
   'photosensitivity-unacknowledged',
   'display-unavailable',
+  'unknown-pattern-profile',
+  'pattern-profile-in-use',
   // Contract validation.
   'invalid-payload'
 ] as const;
@@ -83,8 +92,16 @@ const LEGACY_BY_CODE: Readonly<Record<TimeSpaceSyncErrorCode, LegacyFrameSyncErr
   'degenerate-view': 'camera-unavailable',
   'insufficient-points': 'camera-unavailable',
   'verification-failed': 'camera-unavailable',
+  'decoder-not-running': 'camera-unavailable',
+  'profile-without-fiducials': 'panel-not-found',
+  'intrinsic-profile-missing': 'camera-unavailable',
+  'too-few-corner-frames': 'panel-not-found',
+  'corners-unstable': 'decode-unstable',
+  'orientation-unproven': 'decode-unstable',
   'photosensitivity-unacknowledged': 'camera-unavailable',
   'display-unavailable': 'camera-unavailable',
+  'unknown-pattern-profile': 'camera-unavailable',
+  'pattern-profile-in-use': 'camera-unavailable',
   'invalid-payload': 'camera-unavailable'
 };
 

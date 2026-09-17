@@ -6,13 +6,19 @@ Optical time correspondence and camera placement calibration for TurboWarp. This
 
 ## What it does
 
-Shows a time coded pattern on screen and decodes it back out of a camera, so a recorded frame can be placed against the moment the pattern was drawn. Placement against a measured physical reference is not implemented yet.
+Shows a time coded pattern on screen and decodes it back out of a camera, so a recorded frame can be placed against the moment the pattern was drawn. It also solves where cameras stand against a measured physical reference, and with the `twtss.pattern.v2` profile the same projected pattern serves as that reference.
 
 Everything is behind startup-fixed feature flags in `config/feature-flags.ts`, **off by default**: an extension loaded without them publishes no blocks. Set them before the project starts:
 
 ```js
-globalThis.__TWTSS_FEATURE_FLAGS__ = {opticalTimeSyncV1: true};
+globalThis.__TWTSS_FEATURE_FLAGS__ = {opticalTimeSyncV1: true, placementSolveV1: true};
 ```
+
+### One projected pattern for time and placement
+
+With `use time pattern profile twtss.pattern.v2`, the panel has four corner cells that are lit in every code. Each camera computer runs the decoder as usual, then `measure pattern corners for [SECONDS] seconds`: the corners found in the downscaled decoder frame only say where to look, and each outer corner is measured again in a small window of the full-resolution frame as the meeting point of the two outer edges of its corner cell, each edge located along its length at the halfway level and fitted as a line. Frames are combined by median; a spread above half a pixel is refused. The result is a `twtss/placement-observation` with points `tl`, `tr`, `br`, `bl`, named in the orientation the pattern is drawn. That naming is only proven while the camera is rolled less than 45 degrees and does not see the pattern mirrored; a turned view never decodes, and a mirrored one is refused because its readings do not advance with real time.
+
+The operator measures the same four corners (the outer corners of the lit corner cells) on the wall once, and `pattern reference JSON` turns them into a `twtss/placement-reference`. Send each camera's observation and its `camera model JSON` to the computer solving the rig. Camera Source's own `camera intrinsics JSON` carries no distortion and is refused by `set camera model`.
 
 ### What a measurement does and does not say
 
@@ -59,7 +65,7 @@ See [the Japanese implementation proposal](README.ja.md) for responsibilities, d
 
 ### ロールバック
 
-抽出元の旧経路を移行中は保持し、フラグOFFで切り戻す。保存済み校正形式の互換読取りを保持する。初期雛形にはアルゴリズムもフラグもまだ存在しない。
+抽出元の旧経路を移行中は保持し、フラグOFFで切り戻す。保存済み校正形式の互換読取りを保持する。
 
 ### タスク管理
 
@@ -109,7 +115,7 @@ Arrows indicate provider → consumer. This is a proposal; these integrations ar
 
 ## Requirements and safety
 
-Node.js >=22.18.0 and pnpm 11.11.0. The extension runs unsandboxed because it leases a camera through `turbowarp-camera-source` and draws a full screen overlay. Its only dependency is Camera Source, and only for the declarations describing a camera lease -- a handful of constants and one narrowing function, imported rather than copied so that a change on that side stops this build instead of surfacing in a browser. It does not bundle OpenCV. Published packages and hosted documentation are not available yet.
+Node.js >=22.18.0 and pnpm 11.11.0. The extension runs unsandboxed because it leases a camera through `turbowarp-camera-source` and draws a full screen overlay. Its only dependency is Camera Source, and only for the declarations describing a camera lease -- a handful of constants and one narrowing function, imported rather than copied so that a change on that side stops this build instead of surfacing in a browser. The corner measurement also reads Camera Source's calibration capability at runtime, when it is published, for the lens a camera's pixels were measured through. It does not bundle OpenCV.
 
 ## Development
 
@@ -123,10 +129,10 @@ pnpm run test
 pnpm run repo:check
 ```
 
-Package identity: `@kubohiroya/turbowarp-time-space-sync@0.1.0` (local scaffold, not a published installation).
+Package identity: `@kubohiroya/turbowarp-time-space-sync@0.2.0`.
 Bundle: `dist/time-space-sync.js`. Contract: `dist/extension-manifest.json`.
 
-`pnpm run check` additionally checks generated files against Git. Run it after the initial files have been committed. No initial commit or remote publication is performed by scaffolding.
+`pnpm run check` additionally checks generated files against Git.
 
 ## Block reference
 
@@ -203,6 +209,25 @@ Returns the identifier of the pattern profile in use. The decoder must be given 
 |---|---|
 | Type | Reporter |
 | Opcode | `timePatternProfileId` |
+
+### `use time pattern profile [PROFILE_ID]`
+
+Chooses the pattern the display draws and the decoder reads: twtss.pattern.v1 (the default) or twtss.pattern.v2, which keeps the panel's brightness constant and has lit corner cells that placement can be measured from. Run it before showing the pattern or starting the decoder; once either exists with another profile the choice is refused and nothing changes. The choice lasts until the project stops.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `setTimePatternProfile` |
+| `PROFILE_ID` | String, default: `twtss.pattern.v2` |
+
+### `time pattern profile error`
+
+Returns why the last profile choice was refused -- unknown-pattern-profile or pattern-profile-in-use -- or an empty string when it was accepted.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `timePatternProfileError` |
 
 ### `start optical time decoder for camera [CAMERA_ID] reference [REFERENCE_ID] calibrating [SECONDS] seconds at [REFRESH_US] us refresh`
 
@@ -411,7 +436,7 @@ Stores where one camera saw the reference points, in unmirrored source pixels. M
 
 ### `set camera model for [CAMERA_ID] to [MODEL_JSON]`
 
-Supplies the intrinsics and distortion to interpret one camera pixels with. Take these from Camera Source rather than scaling a calibration profile yourself: only it can tell a scaled capture from a cropped one.
+Supplies the intrinsics and distortion to interpret one camera pixels with, as {intrinsics, distortion} with optional intrinsicProfileId, imageWidth and imageHeight, which a solve checks each observation against. Build it with camera model JSON on the camera computer rather than scaling a calibration profile yourself: only Camera Source can tell a scaled capture from a cropped one.
 
 | Property | Value |
 |---|---|
@@ -419,6 +444,66 @@ Supplies the intrinsics and distortion to interpret one camera pixels with. Take
 | Opcode | `setCameraModel` |
 | `CAMERA_ID` | String, default: `default` |
 | `MODEL_JSON` | String, default: `{}` |
+
+### `camera model JSON for [CAMERA_ID]`
+
+Returns the camera model to pass to set camera model: the intrinsics Camera Source adapted to the current frame, joined with the distortion, profile id and frame size from the calibration profile it holds. Camera Source's own camera intrinsics JSON leaves the distortion out and is refused by set camera model. Empty when Camera Source publishes no calibration, has no profile for the camera, or cannot adapt it to the frame.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `cameraModelJson` |
+| `CAMERA_ID` | String, default: `default` |
+
+### `measure pattern corners for [SECONDS] seconds`
+
+Measures the four outer corners of the projected time pattern in this camera's full-resolution image and builds a twtss/placement-observation from them. Needs the optical time decoder running on twtss.pattern.v2 and a calibration profile for the camera in Camera Source. Each frame's corners are found from the two outer edges of each lit corner cell and the frames are combined by median. The corners are named in the orientation the pattern is drawn, which is only proven while the camera is rolled less than 45 degrees and not seeing the pattern mirrored. A failed measurement clears the previous observation.
+
+| Property | Value |
+|---|---|
+| Type | Command |
+| Opcode | `measurePatternCorners` |
+| `SECONDS` | Number, default: `3` |
+
+### `pattern corner observation JSON`
+
+Returns the last corner measurement as twtss/placement-observation version 1 JSON, with points tl, tr, br and bl in unmirrored source pixels as observed, or an empty string when there is none.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `patternCornerObservationJson` |
+
+### `pattern corner error`
+
+Returns why the last corner measurement failed -- for example decoder-not-running, profile-without-fiducials, intrinsic-profile-missing, too-few-corner-frames, corners-unstable or orientation-unproven -- or an empty string when it succeeded.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `patternCornerError` |
+
+### `pattern corner spread px`
+
+Returns how far the per-frame corners scattered around the measured ones, as an RMS distance in source pixels. Reported for a measurement refused as corners-unstable as well, so the operator can see by how much.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `patternCornerSpreadPx` |
+
+### `pattern reference JSON [REFERENCE_ID] corners [CORNERS] sigma [SIGMA_METERS] measured by [MEASURED_BY]`
+
+Builds the twtss/placement-reference for the projected pattern from the outer corners of its lit corner cells, measured on the wall: tlX,tlY;trX,trY;brX,brY;blX,blY in metres on the wall plane, with any right-angled axes. The rectangularity residual is the largest distance from a corner to the best-fitting rectangle. Returns an empty string when a value is not a number, the corners do not trace a convex outline in that order, or measured by is not tape, laser or nominal.
+
+| Property | Value |
+|---|---|
+| Type | Reporter |
+| Opcode | `patternReferenceJson` |
+| `REFERENCE_ID` | String, default: `wall-projection` |
+| `CORNERS` | String, default: `0,0;0.7,0;0.7,0.7;0,0.7` |
+| `SIGMA_METERS` | Number, default: `0.002` |
+| `MEASURED_BY` | String, default: `tape` |
 
 ### `solve placement for rig [RIG_ID]`
 
