@@ -146,6 +146,24 @@ describe('placing two cameras against one reference', () => {
     expect(result.result.pairs[0]?.baselineMeters).toBeCloseTo(trueBaseline(), 3);
   });
 
+  it('publishes each pose against the reference as measured, not its fitted plane', () => {
+    // The solve works in the plane's own basis, centred on the points. A pose
+    // left in that basis still reprojects perfectly and still gives the right
+    // baseline, so only comparing the transform itself catches it.
+    const result = solve();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    for (const [cameraId, truth] of [
+      ['camera-left', leftTruth],
+      ['camera-right', rightTruth]
+    ] as const) {
+      const solved = result.result.cameras.find((camera) => camera.cameraId === cameraId);
+      solved?.cameraFromReference.forEach((value, index) => {
+        expect(value).toBeCloseTo(truth[index] as number, 4);
+      });
+    }
+  });
+
   it('composes the pair the way the contract says', () => {
     // cameraB_from_cameraA = cameraB_from_reference * reference_from_cameraA.
     const result = solve();
