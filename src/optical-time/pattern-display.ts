@@ -1,5 +1,6 @@
 import {TimeSpaceSyncError, type MonotonicClockPort} from '../contracts/index.js';
 import {encodePatternCells, patternCodeForTimestamp} from './pattern.js';
+import {PATTERN_CELL_GAP_RATIO} from './pattern-geometry.js';
 import {cellCount, requireUsableProfile, type PatternProfile} from './pattern-profile.js';
 
 /**
@@ -81,7 +82,6 @@ const MAXIMUM_REFRESH_US = 100_000;
  * trades against range and wants measuring on real hardware before it is fixed.
  */
 const DEFAULT_PANEL_SCALE = 0.35;
-const CELL_GAP_RATIO = 0.08;
 const DEFAULT_PALETTE: PatternPalette = {
   light: '#ffffff',
   dark: '#000000',
@@ -343,8 +343,8 @@ export function drawPattern(
   const originY = (height - panel) / 2;
   const cellWidth = panel / profile.columns;
   const cellHeight = panel / profile.rows;
-  const gapX = cellWidth * CELL_GAP_RATIO;
-  const gapY = cellHeight * CELL_GAP_RATIO;
+  const gapX = cellWidth * PATTERN_CELL_GAP_RATIO;
+  const gapY = cellHeight * PATTERN_CELL_GAP_RATIO;
   for (let row = 0; row < profile.rows; row += 1) {
     for (let column = 0; column < profile.columns; column += 1) {
       const lit = cells[row * profile.columns + column] === true;

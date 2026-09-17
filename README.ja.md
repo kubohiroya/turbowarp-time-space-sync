@@ -2,12 +2,12 @@
 
 [English](README.md) | **日本語**
 
-`turbowarp-extension-template` v0.4.0を元にした、時刻対応とカメラ配置校正のTurboWarp拡張です。光学時刻パターンの表示・復号までが実装済みで、実寸基準に対する配置solveは未実装です。
+`turbowarp-extension-template` v0.4.0を元にした、時刻対応とカメラ配置校正のTurboWarp拡張です。光学時刻パターンの表示・復号と、実寸基準に対するカメラ配置のsolveを実装しています。`twtss.pattern.v2`では、投影した同じパターンの4隅を配置の基準としても使えます（`measure pattern corners for [SECONDS] seconds`でソース解像度のサブピクセル隅を測り、`pattern reference JSON`で壁上の実測値から基準を作ります）。
 
 機能は`config/feature-flags.ts`の起動時固定フラグで囲ってあり、**既定はOFF**です。フラグなしで読み込むとblockを1つも公開しません。
 
 ```js
-globalThis.__TWTSS_FEATURE_FLAGS__ = {opticalTimeSyncV1: true};
+globalThis.__TWTSS_FEATURE_FLAGS__ = {opticalTimeSyncV1: true, placementSolveV1: true};
 ```
 
 光学観測が拘束するのは、時計差・カメラ側遅延・表示側遅延の**和だけ**です。3つは分離できないため、結果は`displayToTimestampDelayUs`として、折り込まれた成分を列挙して返します。時計差とは呼びません。時刻補正は同時露光を意味しません。
@@ -47,7 +47,7 @@ globalThis.__TWTSS_FEATURE_FLAGS__ = {opticalTimeSyncV1: true};
 
 ### ロールバック
 
-抽出元の旧経路を移行中は保持し、フラグOFFで切り戻す。保存済み校正形式の互換読取りを保持する。初期雛形にはアルゴリズムもフラグもまだ存在しない。
+抽出元の旧経路を移行中は保持し、フラグOFFで切り戻す。保存済み校正形式の互換読取りを保持する。
 
 ### タスク管理
 

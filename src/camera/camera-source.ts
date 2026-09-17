@@ -88,3 +88,101 @@ function wholePositive(value: unknown): number | undefined {
   const parsed = positive(value);
   return parsed === undefined ? undefined : Math.round(parsed);
 }
+
+/**
+ * What Camera Source knows about a camera's lens, as far as placement needs it.
+ *
+ * Camera Source 0.7.0 publishes this through a versioned runtime capability
+ * whose declarations are not part of its `runtime` entry point, so the shape is
+ * narrowed here member by member at runtime rather than trusted. Anything that
+ * does not match reads as absent: a profile id or intrinsics taken from a
+ * shape that merely looks similar would label an observation with a lens it
+ * was not taken through.
+ */
+export interface CameraProfileSummary {
+  readonly profileId: string;
+  readonly distortion: {readonly model: string; readonly coefficients: readonly number[]};
+}
+
+export interface UsableIntrinsics {
+  readonly fx: number;
+  readonly fy: number;
+  readonly cx: number;
+  readonly cy: number;
+  readonly skew: number;
+  /** The frame size these numbers were adapted to. */
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface CameraCalibrationReader {
+  profileFor(cameraId: string): CameraProfileSummary | undefined;
+  /** Intrinsics adapted to the current frame, or undefined when they cannot be established. */
+  intrinsicsFor(cameraId: string): UsableIntrinsics | undefined;
+}
+
+/** Where Camera Source publishes its calibration capability. */
+export const cameraSourceCalibrationKey = 'kubohiroyaCameraSourceCapability';
+const CAMERA_SOURCE_CALIBRATION_VERSION = 1;
+
+/**
+ * Camera Source's calibration surface, or undefined when it is not published.
+ *
+ * It is absent whenever Camera Source was loaded without its calibration flag,
+ * which is an ordinary configuration and not a fault.
+ */
+export function readCameraCalibration(runtime: unknown): CameraCalibrationReader | undefined {
+  if (typeof runtime !== 'object' || runtime === null) return undefined;
+  const candidate = (runtime as Record<string, unknown>)[cameraSourceCalibrationKey];
+  if (typeof candidate !== 'object' || candidate === null) return undefined;
+  const requireVersion = (candidate as {requireVersion?: unknown}).requireVersion;
+  if (typeof requireVersion !== 'function') return undefined;
+  let capability: unknown;
+  try {
+    capability = requireVersion.call(candidate, CAMERA_SOURCE_CALIBRATION_VERSION);
+  } catch {
+    return undefined;
+  }
+  if (typeof capability !== 'object' || capability === null) return undefined;
+  const {profileFor, intrinsicsFor} = capability as {profileFor?: unknown; intrinsicsFor?: unknown};
+  if (typeof profileFor !== 'function' || typeof intrinsicsFor !== 'function') return undefined;
+  return {
+    profileFor: (cameraId) => readProfileSummary(profileFor.call(capability, cameraId)),
+    intrinsicsFor: (cameraId) => readUsableIntrinsics(intrinsicsFor.call(capability, cameraId))
+  };
+}
+
+function readProfileSummary(value: unknown): CameraProfileSummary | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const {profileId, distortion} = value as {profileId?: unknown; distortion?: unknown};
+  if (typeof profileId !== 'string' || profileId.length === 0) return undefined;
+  if (typeof distortion !== 'object' || distortion === null) return undefined;
+  const {model, coefficients} = distortion as {model?: unknown; coefficients?: unknown};
+  if (typeof model !== 'string' || !Array.isArray(coefficients)) return undefined;
+  if (!coefficients.every((entry) => typeof entry === 'number' && Number.isFinite(entry))) {
+    return undefined;
+  }
+  return {profileId, distortion: {model, coefficients: [...(coefficients as number[])]}};
+}
+
+function readUsableIntrinsics(value: unknown): UsableIntrinsics | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const record = value as Record<string, unknown>;
+  const numbers = ['fx', 'fy', 'cx', 'cy', 'skew', 'width', 'height'].map((key) => record[key]);
+  if (!numbers.every((entry) => typeof entry === 'number' && Number.isFinite(entry))) {
+    return undefined;
+  }
+  const [fx, fy, cx, cy, skew, width, height] = numbers as number[];
+  if (!((fx as number) > 0) || !((fy as number) > 0) || !((width as number) > 0) || !((height as number) > 0)) {
+    return undefined;
+  }
+  return {
+    fx: fx as number,
+    fy: fy as number,
+    cx: cx as number,
+    cy: cy as number,
+    skew: skew as number,
+    width: width as number,
+    height: height as number
+  };
+}

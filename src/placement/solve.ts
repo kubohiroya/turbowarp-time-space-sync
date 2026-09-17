@@ -27,6 +27,17 @@ import {toPlanarReference} from './reference.js';
 export interface CameraModelFor {
   readonly intrinsics: Intrinsics;
   readonly distortion: Distortion;
+  /**
+   * The calibration profile the model came from, when the producer said.
+   *
+   * Checked against each observation's own `intrinsicProfileId`: pixels
+   * measured through one calibration and interpreted with another give a pose
+   * that is wrong by the difference, with a residual that does not show it.
+   */
+  readonly intrinsicProfileId?: string;
+  /** The frame size the intrinsics describe, when the producer said. */
+  readonly imageWidth?: number;
+  readonly imageHeight?: number;
 }
 
 export interface SolveOptions {
@@ -87,6 +98,26 @@ export function solvePlacement(options: SolveOptions): SolveResult {
       };
     }
     requireSupportedDistortion(model.distortion);
+    if (
+      model.intrinsicProfileId !== undefined &&
+      model.intrinsicProfileId !== observation.intrinsicProfileId
+    ) {
+      return {
+        ok: false,
+        code: 'intrinsic-profile-mismatch',
+        message: `Camera ${observation.cameraId} was observed through profile ${observation.intrinsicProfileId} but its model comes from ${model.intrinsicProfileId}.`
+      };
+    }
+    if (
+      (model.imageWidth !== undefined && model.imageWidth !== observation.imageWidth) ||
+      (model.imageHeight !== undefined && model.imageHeight !== observation.imageHeight)
+    ) {
+      return {
+        ok: false,
+        code: 'intrinsic-profile-mismatch',
+        message: `Camera ${observation.cameraId} was observed at ${observation.imageWidth}x${observation.imageHeight} but its model describes ${model.imageWidth}x${model.imageHeight}.`
+      };
+    }
 
     const paired = pairPoints(observation, byId, reference);
     if (!paired) {
@@ -133,7 +164,14 @@ export function solvePlacement(options: SolveOptions): SolveResult {
         ? (reference.sigmaMeters / reference.extentMeters) *
           Math.hypot(...solution.best.translation)
         : 0;
-    const cameraFromReference = rigidFromPose(solution.best);
+    // The pose was solved against the plane's own basis. Composing with the map
+    // from reference coordinates into that basis is what makes the published
+    // transform take the points as they were measured, rather than as the
+    // solver happened to re-express them.
+    const cameraFromReference = composeRigidTransforms(
+      rigidFromPose(solution.best),
+      planarFromReference(reference)
+    );
     poses.set(observation.cameraId, cameraFromReference);
     cameras.push({
       cameraId: observation.cameraId,
@@ -221,6 +259,42 @@ export function solvePlacement(options: SolveOptions): SolveResult {
       notes
     }
   };
+}
+
+/**
+ * The rigid map from reference coordinates into the plane's own basis.
+ *
+ * A planar pose treats the plane as z = 0 with its third axis the cross product
+ * of the two in-plane axes. The fitted plane normal is only known up to sign, so
+ * it is not used here: taking it as found would make the map a reflection for
+ * half of all references, and a reflected pose still reprojects perfectly.
+ */
+function planarFromReference(reference: {
+  origin: readonly number[];
+  axisU: readonly number[];
+  axisV: readonly number[];
+}): number[] {
+  const u = reference.axisU;
+  const v = reference.axisV;
+  const w = [
+    (u[1] ?? 0) * (v[2] ?? 0) - (u[2] ?? 0) * (v[1] ?? 0),
+    (u[2] ?? 0) * (v[0] ?? 0) - (u[0] ?? 0) * (v[2] ?? 0),
+    (u[0] ?? 0) * (v[1] ?? 0) - (u[1] ?? 0) * (v[0] ?? 0)
+  ];
+  const rows = [u, v, w];
+  const o = reference.origin;
+  return [
+    ...rows.flatMap((row) => [
+      row[0] ?? 0,
+      row[1] ?? 0,
+      row[2] ?? 0,
+      -((row[0] ?? 0) * (o[0] ?? 0) + (row[1] ?? 0) * (o[1] ?? 0) + (row[2] ?? 0) * (o[2] ?? 0))
+    ]),
+    0,
+    0,
+    0,
+    1
+  ];
 }
 
 /**

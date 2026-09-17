@@ -121,13 +121,7 @@ export class VideoFramePump implements FramePumpPort {
       const capture = captureTimeOf(now, metadata, deliveredAtUs);
       this.context.drawImage(this.element, 0, 0, this.width, this.height);
       const pixels = this.context.getImageData(0, 0, this.width, this.height).data;
-      for (let index = 0; index < this.luminance.length; index += 1) {
-        const offset = index * 4;
-        const red = pixels[offset] ?? 0;
-        const green = pixels[offset + 1] ?? 0;
-        const blue = pixels[offset + 2] ?? 0;
-        this.luminance[index] = (red * 299 + green * 587 + blue * 114) / 1000;
-      }
+      luminanceFromRgba(pixels, this.luminance);
       handler({
         luminance: {width: this.width, height: this.height, data: this.luminance},
         deliveredAtUs,
@@ -145,6 +139,17 @@ export class VideoFramePump implements FramePumpPort {
     } finally {
       this.schedule();
     }
+  }
+}
+
+/** Rec. 601 luma from RGBA bytes, the weighting every reader of frames here uses. */
+export function luminanceFromRgba(pixels: ArrayLike<number>, luminance: Uint8Array): void {
+  for (let index = 0; index < luminance.length; index += 1) {
+    const offset = index * 4;
+    const red = pixels[offset] ?? 0;
+    const green = pixels[offset + 1] ?? 0;
+    const blue = pixels[offset + 2] ?? 0;
+    luminance[index] = (red * 299 + green * 587 + blue * 114) / 1000;
   }
 }
 
