@@ -11,3 +11,9 @@
 確認: 型検査、既存Schemaと新adapterの8テスト、既存Vite/runtime＋独立emit、srcなしDOM/Reactなしisolated import/skipLibCheck:false型検査が成功。全5公開JSONをtitle/$schema/$idまで含めた全文生成比較で確認し、既存--checkの読取経路も実行。前後5 hash一致を記録した。sandbox内のViteポート起動失敗は、sandbox外の同じ--checkで解消した。
 
 段階2のフォーム登録/owner encode/binding、後段のJSON内部候補UIは未実装。既定OFFのGUIフラグは保持。新入口の利用停止/本Issueのcommit revertでrollbackし、保存済みデータの移行は不要。
+
+## S1-5の最終確認
+
+対象は合計9ケース（増分検証を含む）。srcを除いた実packageでReact不在・DOM/VM/通信globalアクセス0、skipLibCheck:falseの型検査を確認し、独立生成10ファイルを再emitと全SHA-256照合した。16契約の横断fixtureと依存artifact照合の記録は共通repoのschema-stage1-*.jsonを参照。既存生成基準は保持する。
+
+validatePlacementSourceを追加し、形式不正・未知variantでも元sourceを保持した安全な診断を返す。raw parser例外を診断へ混ぜない。

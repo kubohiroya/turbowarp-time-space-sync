@@ -21,3 +21,9 @@ it('both placement contracts preserve raw input and add owner-only semantic cons
   expect(structural.validator.validate(duplicate).kind).toBe('valid');expect(decodePlacementSource(source,kind)).toMatchObject({source,data});
  }
 });
+
+import {validatePlacementSource} from '../src/editor-schema.js';
+it('source boundary returns safe format diagnostics while keeping the original string',()=>{
+ const source='{private malformed';const result=validatePlacementSource(source,'reference',context);expect(result.source).toBe(source);expect(result.result.kind).toBe('invalid');expect(JSON.stringify(result.result)).not.toContain('private');
+ const valid=readFileSync('tests/fixtures/contracts/placement-reference-valid.json','utf8');expect(validatePlacementSource(valid,'reference',context).result.kind).toBe('valid');
+});
