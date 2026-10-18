@@ -94,5 +94,7 @@
     "arbitrary_schema_UI": false,
     "GUI_dependency_change": false,
     "cause_investigation": false
-  }
+  },
+  "record_kind": "historical snapshot before Git artifact alignment",
+  "current_record": "editor-schema-publication.json"
 }

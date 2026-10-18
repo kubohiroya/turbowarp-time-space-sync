@@ -1,5 +1,7 @@
 # 段階1: 配置2契約
 
+> 現在のGit依存固定・実解決・検証結果は[editor-schema-publication.ja.md](editor-schema-publication.ja.md)と同名JSONを参照。以下は依存更新前の採取履歴として保持する。
+
 追跡: https://github.com/kubohiroya/turbowarp-time-space-sync/issues/20 。共通親はextension-data-editor #18。
 
 `./editor-schema`はplacementSchemaBundles.reference/observation、各validatePlacement*Input、所有parse関数、decodePlacementSourceを公開する。JSONのsource/raw dataを保持し、登録済みcamera/referenceやcontroller状態を入力条件へ含めない。
