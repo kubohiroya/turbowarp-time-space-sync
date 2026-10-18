@@ -189,6 +189,8 @@ describe('refining the pattern corners at source resolution', () => {
 });
 
 describe('detecting a panel with corner fiducials', () => {
+  // Five 1280x720 synthetic views, with 43 analysis frames each, took 5.3 s on CI.
+  // Keep all views and accuracy assertions; allow CPU headroom on shared runners.
   it('finds the panel square rather than the corners of its notches', () => {
     // The fiducials never change, so the changing region lacks its corner
     // cells. Its extreme points are a cell away from the panel's corners, and
@@ -201,7 +203,7 @@ describe('detecting a panel with corner fiducials', () => {
         COARSE_CORNER_UNCERTAINTY_ANALYSIS_PX * (SOURCE.width / ANALYSIS.width)
       );
     }
-  });
+  }, 15_000);
 
   it('keeps the panel whole when the gaps between cells span whole analysis pixels', () => {
     // A large panel in view: each gap is more than a pixel wide and never

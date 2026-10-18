@@ -19,6 +19,18 @@ PR #21 の段階1差分に対する検証基盤の修正記録。段階2のUI接
 
 共通artifactのpin・lock・実解決と生成物の一致は統合検証でも照合する。過去のpublication記録は当時の基準として保持する。
 
+### CIの局所timeout追補
+
+`890b6f7da12f516064d939ca83526d6f4e543073` のCIで、`tests/optical-time-corners.test.ts` の `finds the panel square rather than the corners of its notches` だけが5294msとなり、Vitestの既定5000msでtimeoutした。残る341テストは成功し、当該テストに精度assertionの失敗は報告されていない。
+
+このテストは5視点それぞれについて1280×720のsynthetic画像を生成し、43枚のanalysis frameでpanelを検出するCPU計算である。視点・画像・精度条件を減らさず、該当テストだけに15000msの上限を明示した。共有CI runnerの余裕を確保しつつ有限の上限を維持する。global timeout、本番algorithm、Schema、データ形式は変更しない。
+
+対象19テストと既存 `pnpm check` の342テストを再検証し、すべて成功した。型、lint、README、Schema/fixture生成照合、build/dist一致、repo policy、pack dry-runも成功した。結果は統合検証記録と以下のログへ保存する。
+
+- `/tmp/schema-stage1-ci-fix-20261018/time-space-sync-new-ci-failure.log`: CIでの5000ms timeout。
+- `/tmp/schema-stage1-ci-fix-20261018/time-space-sync-timeout-targeted.log`: 対象テストファイル。
+- `/tmp/schema-stage1-ci-fix-20261018/time-space-sync-timeout-check.log`: timeout修正後の全check。
+
 ## ロールバック
 
 CI修正commitをrevertし、依存artifactを戻す場合はmanifest・lock・実解決を一組で戻して再検証する。runtime APIとデータ形式は変更していないためデータ移行は不要。段階2以降の開始には、修正artifactへの依存整合と既存の開始条件を別途満たす必要がある。

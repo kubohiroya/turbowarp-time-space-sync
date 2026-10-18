@@ -1,6 +1,6 @@
 {
   "record_kind": "current stage1 CI fix verification snapshot; own final commit is recorded by coordinator to avoid a self hash cycle",
-  "observed_at_utc": "2026-10-18T07:09:40.475354+00:00",
+  "observed_at_utc": "2026-10-18T07:14:44.142669+00:00",
   "repository": "kubohiroya/turbowarp-time-space-sync",
   "branch": "feat/schema/stage1-time-space-sync",
   "base_before_CI_fix": "1e85de6f29b8a5604f133bee75d0cfdad3ded4e7",
@@ -124,8 +124,10 @@
     "full_check_tests": 342,
     "logs_sha256": {
       "time-space-sync-check.log": "faa7ba899c62385043d203bd91734a73dcb076605cd02d1ed6464245099d264b",
+      "time-space-sync-final-package.log": "4324b83470e2eb750d28e7782fc733d20fd347c4b76bb215ca3fa17a01b2ef4c",
       "time-space-sync-repo-npm10-after-doc.log": "6b0c5217e10070716f2a27162d456c7a39f0d7ecb02420ead4c9713a6a5672cf",
-      "time-space-sync-repo-npm10.log": "6b0c5217e10070716f2a27162d456c7a39f0d7ecb02420ead4c9713a6a5672cf"
+      "time-space-sync-repo-npm10.log": "6b0c5217e10070716f2a27162d456c7a39f0d7ecb02420ead4c9713a6a5672cf",
+      "time-space-sync-timeout-check.log": "075fc6d9d0ead6c444e81b3aebcaf321eb27bb36d33760f8f026f836da4398de"
     },
     "prior_215_135_record": "The reviewed production source and emitted hashes remain the baseline; coordinator stores the new artifact/re-emit/dependency results after all pins align.",
     "npm10_pack_regression": "foreground-scripts=false keeps prepare output out of JSON where parsed; Camera Source does not parse pack stdout."
