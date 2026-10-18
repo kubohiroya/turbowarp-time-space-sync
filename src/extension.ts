@@ -1,3 +1,4 @@
+import {registerSourceEditors} from './source-editors.js';
 import {featureFlags} from '../config/feature-flags.js';
 import definitions from './block-definitions.json';
 import {LocalMonotonicClock, SessionClock} from './clock/index.js';
@@ -139,6 +140,8 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
   private placement: PlacementResult | undefined;
   private placementErrorCode = '';
 
+  private readonly removeSourceEditors: () => void;
+
   public constructor(options: TimeSpaceSyncExtensionOptions = {}) {
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? ({} as TurboWarpRuntime);
     this.opticalTimeEnabled = options.opticalTimeEnabled ?? featureFlags.opticalTimeSyncV1;
@@ -154,6 +157,7 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
     this.createRegionReader = options.createRegionReader;
     this.schedule = options.schedule;
     this.publishCapability();
+    this.removeSourceEditors = this.placementEnabled ? registerSourceEditors(Scratch) : () => {};
     this.watchRuntime();
   }
 
@@ -798,7 +802,10 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
       this.acknowledgement = undefined;
     };
     for (const event of ['PROJECT_STOP_ALL', 'PROJECT_LOADED', 'RUNTIME_DISPOSED']) {
-      this.runtime.on?.(event, stop);
+      this.runtime.on?.(event, event === 'RUNTIME_DISPOSED' ? () => {
+        stop();
+        this.removeSourceEditors();
+      } : stop);
     }
   }
 

@@ -137,3 +137,29 @@ export function validatePlacementSource(
     }),
   };
 }
+
+import {parseCameraModel, requireSupportedDistortion} from "./placement/camera-model.js";
+import cameraModelDocument from '../schemas/placement-camera-model.schema.json' with {type: 'json'};
+export const cameraModelSchemaBundle: SchemaBundle = {
+  identity: {ownerId: 'turbowarp-time-space-sync', contractId: 'placement-camera-model', revision: 'source-v1', variantId: 'json'},
+  dialect: '2020-12',
+  root: {retrievalUri: cameraModelDocument.$id, document: cameraModelDocument as SchemaDocument,
+    artifact: {role: 'canonical-schema', source: {"repository": "turbowarp-time-space-sync", "path": "schemas/placement-camera-model.schema.json"}}},
+  resources: [],
+  provenance: {canonicalSources: [{"repository": "turbowarp-time-space-sync", "path": "schemas/placement-camera-model.schema.json"}, {repository: 'turbowarp-time-space-sync', path: 'src/placement/camera-model.ts'}], generatedFiles: [], referenceSchemas: [], generationSources: []},
+};
+const cameraModelCompilation = compileSchemaBundle(cameraModelSchemaBundle);
+export function decodeCameraModelSource(source: string) {
+  return {source, format: 'json' as const, variantId: 'json', data: JSON.parse(source) as SchemaJsonValue};
+}
+/** Validate only the supplied source; no controller or runtime resources are touched. */
+export function validateCameraModelSource(source: string, context: SchemaValidationContext) {
+  if (cameraModelCompilation.kind !== 'compiled') return {source, result: cameraModelCompilation};
+  let data: SchemaJsonValue;
+  try {data = JSON.parse(source) as SchemaJsonValue;} catch {
+    return {source, result: {kind: 'invalid' as const, diagnostics: [{scope: {identity: cameraModelSchemaBundle.identity}, phase: 'decode' as const, code: 'input-format-invalid' as const, dataPath: ''}]}};
+  }
+  const accepted = (): boolean => { try {const parsed = parseCameraModel(JSON.parse(source)); if (!parsed.ok) return false; requireSupportedDistortion(parsed.distortion); return true;} catch {return false;} };
+  return {source, result: validateSchemaInput(cameraModelCompilation.validator, data, {context, ownerValidate: () => accepted()
+    ? {kind: 'valid', issues: []} : {kind: 'invalid', issues: [{dataPath: '', ruleId: 'placement-camera-model-owner-input'}]}})};
+}
