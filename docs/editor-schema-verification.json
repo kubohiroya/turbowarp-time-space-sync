@@ -1,0 +1,45 @@
+{
+  "stage": "S1-4/p",
+  "repository": "turbowarp-time-space-sync",
+  "issue": "https://github.com/kubohiroya/turbowarp-time-space-sync/issues/20",
+  "base": "28ce8bfe1e875c378f4100710ed1e41170962ce5",
+  "branch": "feat/schema/stage1-time-space-sync",
+  "targeted_tests_passed": 8,
+  "typecheck": "passed",
+  "existing_build_and_editor_emit": "passed",
+  "source_absent_isolated_import": "passed",
+  "isolated_no_DOM_skipLibCheck_false": "passed",
+  "resolved_dependencies": {
+    "@kubohiroya/turbowarp-extension-data-editor": {
+      "version": "0.1.0",
+      "resolved_path": "/private/tmp/schema-stage1-worktrees-20261018/time-space-sync/node_modules/.pnpm/@kubohiroya+turbowarp-extension-data-editor@https+++codeload.github.com+kubohiroya+turb_5f902832b16dc00a1fc95546529ab82c/node_modules/@kubohiroya/turbowarp-extension-data-editor",
+      "manifest_sha256": "3e86db1bf667088a7a87ada19fc11573082918335dd281073464ca4fcebf74da",
+      "specifier": "git+https://github.com/kubohiroya/turbowarp-extension-data-editor.git#a1ab4f4f5b384eef08ef26e544186ee9d8ad4543"
+    },
+    "@kubohiroya/turbowarp-camera-source": {
+      "version": "0.7.0",
+      "resolved_path": "/private/tmp/schema-stage1-worktrees-20261018/time-space-sync/node_modules/.pnpm/@kubohiroya+turbowarp-camera-source@0.7.0/node_modules/@kubohiroya/turbowarp-camera-source",
+      "manifest_sha256": "0e57d20e1011d66be4673eef8a60e948d1f261bfade0b0836c33b3f1f00e0c62",
+      "specifier": "0.7.0"
+    }
+  },
+  "emitted_sha256": {
+    "lib-editor/schemas/placement-observation-v1.schema.json": "b2c629bbeb7cc5e0fa005eeafcc005f6bf67274a122cd0b379564dd72e08bc93",
+    "lib-editor/schemas/placement-reference-v1.schema.json": "246eca7737f259e660639dcb58589f765b1282d81c2724b97271fa82949df8b9",
+    "lib-editor/src/contracts/placement.d.ts": "84538e278dc050f50d38e52e8175d348ae45c54fb94fbeeda6d2092199355ee9",
+    "lib-editor/src/contracts/placement.js": "7bec42a80ab10a35377b4d14e6fa059945a0e8fa6946c6a556ba19acaf324feb",
+    "lib-editor/src/contracts/rigid-transform.d.ts": "5e583e55d407c781ce54b46d713a54c75ef0b0f16799bb256141d8066522fd24",
+    "lib-editor/src/contracts/rigid-transform.js": "132eabfa84c8a63fea0f2c49790c2f1e6dfa8d0c1dd65d1294ce28cdddb333da",
+    "lib-editor/src/contracts/spec.d.ts": "2dcce1208977e6c6393d252371541c44dec6aa6c7fe3224c0f731c2fbeca4960",
+    "lib-editor/src/contracts/spec.js": "7b046e14438f8c251d47e1701d048a5c521662a69b702556bc76f72b72850d33",
+    "lib-editor/src/editor-schema.d.ts": "03c71ff526a491ab5177dd63d9d90ff9099f52c9f0a4f5cf0b2b40453d132831",
+    "lib-editor/src/editor-schema.js": "5d0d108c6d10fecc2fe547f9505f554aadde5fda2fdf69c66ed66d58d50a66b6"
+  },
+  "scope": {
+    "new_extension_editor_registration": false,
+    "schema_authoring_UI": false,
+    "arbitrary_schema_UI": false,
+    "GUI_dependency_change": false,
+    "cause_investigation": false
+  }
+}
