@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:twts:placement-camera-model",
+  "type": "object",
+  "required": [
+    "intrinsics",
+    "distortion"
+  ],
+  "properties": {
+    "intrinsics": {
+      "type": "object",
+      "required": [
+        "fx",
+        "fy",
+        "cx",
+        "cy",
+        "skew"
+      ],
+      "properties": {
+        "fx": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "fy": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cx": {
+          "type": "number"
+        },
+        "cy": {
+          "type": "number"
+        },
+        "skew": {
+          "type": "number"
+        }
+      }
+    },
+    "distortion": {
+      "type": "object",
+      "required": [
+        "model",
+        "coefficients"
+      ],
+      "properties": {
+        "model": {
+          "enum": [
+            "none",
+            "brown-conrady"
+          ]
+        },
+        "coefficients": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "model": {
+            "const": "brown-conrady"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "coefficients": {
+            "minItems": 4
+          }
+        }
+      }
+    },
+    "intrinsicProfileId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "imageWidth": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "imageHeight": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
