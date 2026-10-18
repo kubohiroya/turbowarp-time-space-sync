@@ -169,7 +169,9 @@ function checkGeneratedArtifacts() {
 }
 
 async function checkPackContents() {
-  const {stdout} = await execFileAsync('npm', ['pack', '--dry-run', '--ignore-scripts', '--json']);
+  const {stdout} = await execFileAsync('npm', [
+    'pack', '--dry-run', '--ignore-scripts', '--foreground-scripts=false', '--json'
+  ]);
   const [pack] = JSON.parse(stdout) as PackResult[];
   if (!pack) {
     errors.push('npm pack must report a package');
