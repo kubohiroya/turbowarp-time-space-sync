@@ -21,7 +21,7 @@ const ENTRY = new URL('../src/runtime.ts', import.meta.url);
  * turbowarp-ar, so the entry is guarded rather than trusted.
  */
 describe('the published runtime sub-entry', () => {
-  it('is exposed under ./runtime and nowhere else', () => {
+  it('keeps the runtime and explicit pure editor entry separate', () => {
     // No "." entry: dist/time-space-sync.js is loaded by URL from TurboWarp
     // rather than imported, and exposing it would let a stray bare import pull
     // the whole extension into a consumer's bundle.
@@ -29,7 +29,12 @@ describe('the published runtime sub-entry', () => {
       types: './lib/runtime.d.ts',
       default: './lib/runtime.js'
     });
-    expect(Object.keys(packageMetadata.exports)).toEqual(['./runtime', './package.json']);
+    expect(packageMetadata.exports['./editor-schema']).toEqual({
+      types: './lib-editor/src/editor-schema.d.ts',
+      import: './lib-editor/src/editor-schema.js'
+    });
+    expect(packageMetadata.files).toContain('lib-editor/');
+    expect(Object.keys(packageMetadata.exports)).toEqual(['./runtime', './package.json', './editor-schema']);
   });
 
   it('does not claim the package is free of side effects', () => {
