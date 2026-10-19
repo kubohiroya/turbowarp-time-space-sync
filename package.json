@@ -64,7 +64,7 @@
     "prepack": "pnpm run build",
     "lint": "eslint src tests scripts vite.config.ts",
     "test": "vitest run",
-    "docs": "node scripts/generate-readme.ts",
+    "docs": "node scripts/generate-readme.ts && node scripts/generate-fixed-input-docs.mjs",
     "schemas": "node scripts/generate-schemas.ts",
     "schemas:check": "node scripts/generate-schemas.ts --check",
     "fixtures": "node scripts/generate-fixtures.ts",
@@ -92,6 +92,6 @@
   },
   "dependencies": {
     "@kubohiroya/turbowarp-camera-source": "0.7.0",
-    "@kubohiroya/turbowarp-extension-data-editor": "git+https://github.com/kubohiroya/turbowarp-extension-data-editor.git#76fa1d50a3c188082ceef723ea018a9d8769ea6e"
+    "@kubohiroya/turbowarp-extension-data-editor": "git+https://github.com/kubohiroya/turbowarp-extension-data-editor.git#485f0e550e622235624b5e9176820161aeeba252"
   }
 }

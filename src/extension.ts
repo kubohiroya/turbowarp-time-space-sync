@@ -1,3 +1,4 @@
+import {fixedInputEditors, registerFixedInputEditors} from './fixed-input-editors.js';
 import {registerSourceEditors} from './source-editors.js';
 import {featureFlags} from '../config/feature-flags.js';
 import definitions from './block-definitions.json';
@@ -141,6 +142,7 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
   private placementErrorCode = '';
 
   private readonly removeSourceEditors: () => void;
+  private removeFixedEditors: () => void = () => {};
 
   public constructor(options: TimeSpaceSyncExtensionOptions = {}) {
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? ({} as TurboWarpRuntime);
@@ -156,9 +158,18 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
     this.createFramePump = options.createFramePump;
     this.createRegionReader = options.createRegionReader;
     this.schedule = options.schedule;
-    this.publishCapability();
     this.removeSourceEditors = this.placementEnabled ? registerSourceEditors(Scratch) : () => {};
-    this.watchRuntime();
+    try {
+      const visibleOpcodes = new Set(blockDefinitions.filter(block => this.featureEnabled(block.feature)).map(block => `${extensionConfig.id}_${block.opcode}`));
+      this.removeFixedEditors = registerFixedInputEditors(typeof Scratch === 'undefined' ? undefined : Scratch,
+        fixedInputEditors.filter(editor => editor.opcodes.every(opcode => visibleOpcodes.has(opcode))), this.runtime);
+      this.publishCapability();
+      this.watchRuntime();
+    } catch (error) {
+      this.removeFixedEditors();
+      this.removeSourceEditors();
+      throw error;
+    }
   }
 
   public getInfo(): Record<string, unknown> {
@@ -804,6 +815,7 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
     for (const event of ['PROJECT_STOP_ALL', 'PROJECT_LOADED', 'RUNTIME_DISPOSED']) {
       this.runtime.on?.(event, event === 'RUNTIME_DISPOSED' ? () => {
         stop();
+        this.removeFixedEditors();
         this.removeSourceEditors();
       } : stop);
     }
