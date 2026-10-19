@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kubohiroya.github.io/turbowarp-time-space-sync/schemas/block-editor-fixed-inputs.schema.json",
+  "$defs": {
+    "startOpticalTimeDecoder": {
+      "type": "object",
+      "properties": {
+        "SECONDS": {
+          "type": "number",
+          "maximum": 60
+        },
+        "REFRESH_US": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "calibrateOpticalTimeDecoder": {
+      "type": "object",
+      "properties": {
+        "SECONDS": {
+          "type": "number",
+          "maximum": 60
+        }
+      },
+      "additionalProperties": false
+    },
+    "measurePatternCorners": {
+      "type": "object",
+      "properties": {
+        "SECONDS": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 60
+        }
+      },
+      "additionalProperties": false
+    },
+    "patternReferenceJson": {
+      "type": "object",
+      "properties": {
+        "SIGMA_METERS": {
+          "type": "number",
+          "minimum": 0
+        },
+        "MEASURED_BY": {
+          "type": "string",
+          "enum": [
+            "tape",
+            "laser",
+            "nominal"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

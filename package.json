@@ -1,6 +1,6 @@
 {
   "name": "@kubohiroya/turbowarp-time-space-sync",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "時刻対応とカメラ配置の校正 for TurboWarp.",
   "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "license": "MPL-2.0",
@@ -64,7 +64,7 @@
     "prepack": "pnpm run build",
     "lint": "eslint src tests scripts vite.config.ts",
     "test": "vitest run",
-    "docs": "node scripts/generate-readme.ts",
+    "docs": "node scripts/generate-readme.ts && node scripts/generate-fixed-input-docs.mjs",
     "schemas": "node scripts/generate-schemas.ts",
     "schemas:check": "node scripts/generate-schemas.ts --check",
     "fixtures": "node scripts/generate-fixtures.ts",
@@ -80,8 +80,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@kubohiroya/turbowarp-extension-manifest": "0.2.0",
-    "@kubohiroya/vite-plugin-turbowarp-extension": "0.3.0",
+    "@kubohiroya/turbowarp-extension-manifest": "0.3.2",
+    "@kubohiroya/vite-plugin-turbowarp-extension": "0.6.1",
     "@types/node": "^24.13.3",
     "eslint": "^9.39.5",
     "typescript": "^5.9.3",
@@ -91,7 +91,13 @@
     "react-dom": "18.3.1"
   },
   "dependencies": {
-    "@kubohiroya/turbowarp-camera-source": "0.7.0",
-    "@kubohiroya/turbowarp-extension-data-editor": "git+https://github.com/kubohiroya/turbowarp-extension-data-editor.git#76fa1d50a3c188082ceef723ea018a9d8769ea6e"
+    "@kubohiroya/turbowarp-camera-source": "0.17.1",
+    "@kubohiroya/turbowarp-extension-data-editor": "0.2.1"
+  },
+  "gitHead": "429abd35dd2f43ba96a5523d822b37843ffd6f0a",
+  "x-turbowarp-source": {
+    "revision": "429abd35dd2f43ba96a5523d822b37843ffd6f0a",
+    "revisionRole": "base-commit",
+    "sourceState": "local-release-overlay"
   }
 }

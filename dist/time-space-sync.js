@@ -57,6 +57,66 @@
   	docsURI: "https://kubohiroya.github.io/turbowarp-time-space-sync/",
   	blockIconURI: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCI+PHJlY3QgeD0iNCIgeT0iOCIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE0IiByeD0iMyIgZmlsbD0iIzRDOTdGRiIvPjxyZWN0IHg9IjI2IiB5PSI4IiB3aWR0aD0iMTgiIGhlaWdodD0iMTQiIHJ4PSIzIiBmaWxsPSIjNTlDMDU5Ii8+PHJlY3QgeD0iMTUiIHk9IjI2IiB3aWR0aD0iMTgiIGhlaWdodD0iMTQiIHJ4PSIzIiBmaWxsPSIjRkZBQjE5Ii8+PC9zdmc+"
   };
+  var JsonSnapshotError = class extends Error {
+  	constructor(kind, dataPath) {
+  		super("JSON snapshot failed.");
+  		this.kind = kind;
+  		this.dataPath = dataPath;
+  	}
+  };
+  function appendPointer(path, key) {
+  	return `${path}/${key.replace(/~/g, "~0").replace(/\//g, "~1")}`;
+  }
+  /** Copy JSON values without invoking accessors, toJSON, or input iterators. */
+  function snapshotJson(value) {
+  	const active = /* @__PURE__ */ new WeakSet();
+  	let remaining = 1e5;
+  	const visit = (input, path, depth) => {
+  		if (--remaining < 0 || depth > 128) throw new JsonSnapshotError("limit", path);
+  		if (input === null || typeof input === "string" || typeof input === "boolean") return input;
+  		if (typeof input === "number" && Number.isFinite(input)) return input;
+  		if (typeof input !== "object" || input === null || active.has(input)) throw new JsonSnapshotError("invalid", path);
+  		const array = Array.isArray(input);
+  		const prototype = Object.getPrototypeOf(input);
+  		if (!array && prototype !== null && prototype !== Object.prototype) throw new JsonSnapshotError("invalid", path);
+  		if (Object.getOwnPropertySymbols(input).length) throw new JsonSnapshotError("invalid", path);
+  		active.add(input);
+  		try {
+  			if (array) {
+  				const length = input.length;
+  				if (!Number.isSafeInteger(length) || length > remaining) throw new JsonSnapshotError("limit", path);
+  				const result = [];
+  				for (let i = 0; i < length; i++) {
+  					const child = appendPointer(path, String(i));
+  					const descriptor = Object.getOwnPropertyDescriptor(input, i);
+  					if (!descriptor || !("value" in descriptor)) throw new JsonSnapshotError("invalid", child);
+  					result.push(visit(descriptor.value, child, depth + 1));
+  				}
+  				for (const key of Object.keys(input)) if (!/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= length) throw new JsonSnapshotError("invalid", appendPointer(path, key));
+  				return result;
+  			}
+  			const result = {};
+  			for (const key of Object.keys(input)) {
+  				const child = appendPointer(path, key);
+  				const descriptor = Object.getOwnPropertyDescriptor(input, key);
+  				if (!descriptor || !("value" in descriptor)) throw new JsonSnapshotError("invalid", child);
+  				Object.defineProperty(result, key, {
+  					value: visit(descriptor.value, child, depth + 1),
+  					enumerable: true,
+  					writable: true,
+  					configurable: true
+  				});
+  			}
+  			return result;
+  		} finally {
+  			active.delete(input);
+  		}
+  	};
+  	return visit(value, "", 0);
+  }
+  function isJsonRecord(value) {
+  	return value !== null && typeof value === "object" && !Array.isArray(value);
+  }
   var require_code$1 = /* @__PURE__ */ __commonJSMin(((exports) => {
   	Object.defineProperty(exports, "__esModule", { value: true });
   	exports.regexpCode = exports.getEsmExportName = exports.getProperty = exports.safeStringify = exports.stringify = exports.strConcat = exports.addCodeArg = exports.str = exports._ = exports.nil = exports._Code = exports.Name = exports.IDENTIFIER = exports._CodeOrName = void 0;
@@ -2719,16 +2779,16 @@
   	}
   }));
   var data_exports = /* @__PURE__ */ __exportAll({
-  	$id: () => $id$12,
+  	$id: () => $id$13,
   	additionalProperties: () => false,
   	default: () => data_default,
   	description: () => description,
   	properties: () => properties$12,
   	required: () => required$3,
   	type: () => type$12
-  }), $id$12, description, type$12, required$3, properties$12, data_default;
+  }), $id$13, description, type$12, required$3, properties$12, data_default;
   var init_data = __esmMin((() => {
-  	$id$12 = "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#";
+  	$id$13 = "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#";
   	description = "Meta-schema for $data reference (JSON AnySchema extension proposal)";
   	type$12 = "object";
   	required$3 = ["$data"];
@@ -2737,7 +2797,7 @@
   		"anyOf": [{ "format": "relative-json-pointer" }, { "format": "json-pointer" }]
   	} };
   	data_default = {
-  		$id: $id$12,
+  		$id: $id$13,
   		description,
   		type: type$12,
   		required: required$3,
@@ -5989,18 +6049,18 @@
   	};
   }));
   var json_schema_draft_07_exports = /* @__PURE__ */ __exportAll({
-  	$id: () => $id$11,
-  	$schema: () => $schema$11,
+  	$id: () => $id$12,
+  	$schema: () => $schema$12,
   	default: () => json_schema_draft_07_default,
   	definitions: () => definitions,
   	properties: () => properties$11,
   	title: () => title$10,
   	type: () => type$11
   });
-  var $schema$11, $id$11, title$10, definitions, type$11, properties$11, json_schema_draft_07_default;
+  var $schema$12, $id$12, title$10, definitions, type$11, properties$11, json_schema_draft_07_default;
   var init_json_schema_draft_07 = __esmMin((() => {
-  	$schema$11 = "http://json-schema.org/draft-07/schema#";
-  	$id$11 = "http://json-schema.org/draft-07/schema#";
+  	$schema$12 = "http://json-schema.org/draft-07/schema#";
+  	$id$12 = "http://json-schema.org/draft-07/schema#";
   	title$10 = "Core schema meta-schema";
   	definitions = {
   		"schemaArray": {
@@ -6131,8 +6191,8 @@
   		"not": { "$ref": "#" }
   	};
   	json_schema_draft_07_default = {
-  		$schema: $schema$11,
-  		$id: $id$11,
+  		$schema: $schema$12,
+  		$id: $id$12,
   		title: title$10,
   		definitions,
   		type: type$11,
@@ -6504,8 +6564,8 @@
   var schema_exports = /* @__PURE__ */ __exportAll({
   	$comment: () => $comment,
   	$dynamicAnchor: () => $dynamicAnchor$7,
-  	$id: () => $id$10,
-  	$schema: () => $schema$10,
+  	$id: () => $id$11,
+  	$schema: () => $schema$11,
   	$vocabulary: () => $vocabulary$7,
   	allOf: () => allOf,
   	default: () => schema_default,
@@ -6513,10 +6573,10 @@
   	title: () => title$9,
   	type: () => type$10
   });
-  var $schema$10, $id$10, $vocabulary$7, $dynamicAnchor$7, title$9, allOf, type$10, $comment, properties$10, schema_default;
+  var $schema$11, $id$11, $vocabulary$7, $dynamicAnchor$7, title$9, allOf, type$10, $comment, properties$10, schema_default;
   var init_schema = __esmMin((() => {
-  	$schema$10 = "https://json-schema.org/draft/2020-12/schema";
-  	$id$10 = "https://json-schema.org/draft/2020-12/schema";
+  	$schema$11 = "https://json-schema.org/draft/2020-12/schema";
+  	$id$11 = "https://json-schema.org/draft/2020-12/schema";
   	$vocabulary$7 = {
   		"https://json-schema.org/draft/2020-12/vocab/core": true,
   		"https://json-schema.org/draft/2020-12/vocab/applicator": true,
@@ -6566,8 +6626,8 @@
   		}
   	};
   	schema_default = {
-  		$schema: $schema$10,
-  		$id: $id$10,
+  		$schema: $schema$11,
+  		$id: $id$11,
   		$vocabulary: $vocabulary$7,
   		$dynamicAnchor: $dynamicAnchor$7,
   		title: title$9,
@@ -6578,20 +6638,20 @@
   	};
   }));
   var applicator_exports = /* @__PURE__ */ __exportAll({
-  	$defs: () => $defs$2,
+  	$defs: () => $defs$3,
   	$dynamicAnchor: () => $dynamicAnchor$6,
-  	$id: () => $id$9,
-  	$schema: () => $schema$9,
+  	$id: () => $id$10,
+  	$schema: () => $schema$10,
   	$vocabulary: () => $vocabulary$6,
   	default: () => applicator_default,
   	properties: () => properties$9,
   	title: () => title$8,
   	type: () => type$9
   });
-  var $schema$9, $id$9, $vocabulary$6, $dynamicAnchor$6, title$8, type$9, properties$9, $defs$2, applicator_default;
+  var $schema$10, $id$10, $vocabulary$6, $dynamicAnchor$6, title$8, type$9, properties$9, $defs$3, applicator_default;
   var init_applicator = __esmMin((() => {
-  	$schema$9 = "https://json-schema.org/draft/2020-12/schema";
-  	$id$9 = "https://json-schema.org/draft/2020-12/meta/applicator";
+  	$schema$10 = "https://json-schema.org/draft/2020-12/schema";
+  	$id$10 = "https://json-schema.org/draft/2020-12/meta/applicator";
   	$vocabulary$6 = { "https://json-schema.org/draft/2020-12/vocab/applicator": true };
   	$dynamicAnchor$6 = "meta";
   	title$8 = "Applicator vocabulary meta-schema";
@@ -6626,36 +6686,36 @@
   		"oneOf": { "$ref": "#/$defs/schemaArray" },
   		"not": { "$dynamicRef": "#meta" }
   	};
-  	$defs$2 = { "schemaArray": {
+  	$defs$3 = { "schemaArray": {
   		"type": "array",
   		"minItems": 1,
   		"items": { "$dynamicRef": "#meta" }
   	} };
   	applicator_default = {
-  		$schema: $schema$9,
-  		$id: $id$9,
+  		$schema: $schema$10,
+  		$id: $id$10,
   		$vocabulary: $vocabulary$6,
   		$dynamicAnchor: $dynamicAnchor$6,
   		title: title$8,
   		type: type$9,
   		properties: properties$9,
-  		$defs: $defs$2
+  		$defs: $defs$3
   	};
   }));
   var unevaluated_exports = /* @__PURE__ */ __exportAll({
   	$dynamicAnchor: () => $dynamicAnchor$5,
-  	$id: () => $id$8,
-  	$schema: () => $schema$8,
+  	$id: () => $id$9,
+  	$schema: () => $schema$9,
   	$vocabulary: () => $vocabulary$5,
   	default: () => unevaluated_default,
   	properties: () => properties$8,
   	title: () => title$7,
   	type: () => type$8
   });
-  var $schema$8, $id$8, $vocabulary$5, $dynamicAnchor$5, title$7, type$8, properties$8, unevaluated_default;
+  var $schema$9, $id$9, $vocabulary$5, $dynamicAnchor$5, title$7, type$8, properties$8, unevaluated_default;
   var init_unevaluated = __esmMin((() => {
-  	$schema$8 = "https://json-schema.org/draft/2020-12/schema";
-  	$id$8 = "https://json-schema.org/draft/2020-12/meta/unevaluated";
+  	$schema$9 = "https://json-schema.org/draft/2020-12/schema";
+  	$id$9 = "https://json-schema.org/draft/2020-12/meta/unevaluated";
   	$vocabulary$5 = { "https://json-schema.org/draft/2020-12/vocab/unevaluated": true };
   	$dynamicAnchor$5 = "meta";
   	title$7 = "Unevaluated applicator vocabulary meta-schema";
@@ -6665,8 +6725,8 @@
   		"unevaluatedProperties": { "$dynamicRef": "#meta" }
   	};
   	unevaluated_default = {
-  		$schema: $schema$8,
-  		$id: $id$8,
+  		$schema: $schema$9,
+  		$id: $id$9,
   		$vocabulary: $vocabulary$5,
   		$dynamicAnchor: $dynamicAnchor$5,
   		title: title$7,
@@ -6676,18 +6736,18 @@
   }));
   var content_exports = /* @__PURE__ */ __exportAll({
   	$dynamicAnchor: () => $dynamicAnchor$4,
-  	$id: () => $id$7,
-  	$schema: () => $schema$7,
+  	$id: () => $id$8,
+  	$schema: () => $schema$8,
   	$vocabulary: () => $vocabulary$4,
   	default: () => content_default,
   	properties: () => properties$7,
   	title: () => title$6,
   	type: () => type$7
   });
-  var $schema$7, $id$7, $vocabulary$4, $dynamicAnchor$4, title$6, type$7, properties$7, content_default;
+  var $schema$8, $id$8, $vocabulary$4, $dynamicAnchor$4, title$6, type$7, properties$7, content_default;
   var init_content = __esmMin((() => {
-  	$schema$7 = "https://json-schema.org/draft/2020-12/schema";
-  	$id$7 = "https://json-schema.org/draft/2020-12/meta/content";
+  	$schema$8 = "https://json-schema.org/draft/2020-12/schema";
+  	$id$8 = "https://json-schema.org/draft/2020-12/meta/content";
   	$vocabulary$4 = { "https://json-schema.org/draft/2020-12/vocab/content": true };
   	$dynamicAnchor$4 = "meta";
   	title$6 = "Content vocabulary meta-schema";
@@ -6698,8 +6758,8 @@
   		"contentSchema": { "$dynamicRef": "#meta" }
   	};
   	content_default = {
-  		$schema: $schema$7,
-  		$id: $id$7,
+  		$schema: $schema$8,
+  		$id: $id$8,
   		$vocabulary: $vocabulary$4,
   		$dynamicAnchor: $dynamicAnchor$4,
   		title: title$6,
@@ -6708,20 +6768,20 @@
   	};
   }));
   var core_exports = /* @__PURE__ */ __exportAll({
-  	$defs: () => $defs$1,
+  	$defs: () => $defs$2,
   	$dynamicAnchor: () => $dynamicAnchor$3,
-  	$id: () => $id$6,
-  	$schema: () => $schema$6,
+  	$id: () => $id$7,
+  	$schema: () => $schema$7,
   	$vocabulary: () => $vocabulary$3,
   	default: () => core_default,
   	properties: () => properties$6,
   	title: () => title$5,
   	type: () => type$6
   });
-  var $schema$6, $id$6, $vocabulary$3, $dynamicAnchor$3, title$5, type$6, properties$6, $defs$1, core_default;
+  var $schema$7, $id$7, $vocabulary$3, $dynamicAnchor$3, title$5, type$6, properties$6, $defs$2, core_default;
   var init_core = __esmMin((() => {
-  	$schema$6 = "https://json-schema.org/draft/2020-12/schema";
-  	$id$6 = "https://json-schema.org/draft/2020-12/meta/core";
+  	$schema$7 = "https://json-schema.org/draft/2020-12/schema";
+  	$id$7 = "https://json-schema.org/draft/2020-12/meta/core";
   	$vocabulary$3 = { "https://json-schema.org/draft/2020-12/vocab/core": true };
   	$dynamicAnchor$3 = "meta";
   	title$5 = "Core vocabulary meta-schema";
@@ -6748,7 +6808,7 @@
   			"additionalProperties": { "$dynamicRef": "#meta" }
   		}
   	};
-  	$defs$1 = {
+  	$defs$2 = {
   		"anchorString": {
   			"type": "string",
   			"pattern": "^[A-Za-z_][-A-Za-z0-9._]*$"
@@ -6763,38 +6823,38 @@
   		}
   	};
   	core_default = {
-  		$schema: $schema$6,
-  		$id: $id$6,
+  		$schema: $schema$7,
+  		$id: $id$7,
   		$vocabulary: $vocabulary$3,
   		$dynamicAnchor: $dynamicAnchor$3,
   		title: title$5,
   		type: type$6,
   		properties: properties$6,
-  		$defs: $defs$1
+  		$defs: $defs$2
   	};
   }));
   var format_annotation_exports = /* @__PURE__ */ __exportAll({
   	$dynamicAnchor: () => $dynamicAnchor$2,
-  	$id: () => $id$5,
-  	$schema: () => $schema$5,
+  	$id: () => $id$6,
+  	$schema: () => $schema$6,
   	$vocabulary: () => $vocabulary$2,
   	default: () => format_annotation_default,
   	properties: () => properties$5,
   	title: () => title$4,
   	type: () => type$5
   });
-  var $schema$5, $id$5, $vocabulary$2, $dynamicAnchor$2, title$4, type$5, properties$5, format_annotation_default;
+  var $schema$6, $id$6, $vocabulary$2, $dynamicAnchor$2, title$4, type$5, properties$5, format_annotation_default;
   var init_format_annotation = __esmMin((() => {
-  	$schema$5 = "https://json-schema.org/draft/2020-12/schema";
-  	$id$5 = "https://json-schema.org/draft/2020-12/meta/format-annotation";
+  	$schema$6 = "https://json-schema.org/draft/2020-12/schema";
+  	$id$6 = "https://json-schema.org/draft/2020-12/meta/format-annotation";
   	$vocabulary$2 = { "https://json-schema.org/draft/2020-12/vocab/format-annotation": true };
   	$dynamicAnchor$2 = "meta";
   	title$4 = "Format vocabulary meta-schema for annotation results";
   	type$5 = ["object", "boolean"];
   	properties$5 = { "format": { "type": "string" } };
   	format_annotation_default = {
-  		$schema: $schema$5,
-  		$id: $id$5,
+  		$schema: $schema$6,
+  		$id: $id$6,
   		$vocabulary: $vocabulary$2,
   		$dynamicAnchor: $dynamicAnchor$2,
   		title: title$4,
@@ -6804,18 +6864,18 @@
   }));
   var meta_data_exports = /* @__PURE__ */ __exportAll({
   	$dynamicAnchor: () => $dynamicAnchor$1,
-  	$id: () => $id$4,
-  	$schema: () => $schema$4,
+  	$id: () => $id$5,
+  	$schema: () => $schema$5,
   	$vocabulary: () => $vocabulary$1,
   	default: () => meta_data_default,
   	properties: () => properties$4,
   	title: () => title$3,
   	type: () => type$4
   });
-  var $schema$4, $id$4, $vocabulary$1, $dynamicAnchor$1, title$3, type$4, properties$4, meta_data_default;
+  var $schema$5, $id$5, $vocabulary$1, $dynamicAnchor$1, title$3, type$4, properties$4, meta_data_default;
   var init_meta_data = __esmMin((() => {
-  	$schema$4 = "https://json-schema.org/draft/2020-12/schema";
-  	$id$4 = "https://json-schema.org/draft/2020-12/meta/meta-data";
+  	$schema$5 = "https://json-schema.org/draft/2020-12/schema";
+  	$id$5 = "https://json-schema.org/draft/2020-12/meta/meta-data";
   	$vocabulary$1 = { "https://json-schema.org/draft/2020-12/vocab/meta-data": true };
   	$dynamicAnchor$1 = "meta";
   	title$3 = "Meta-data vocabulary meta-schema";
@@ -6842,8 +6902,8 @@
   		}
   	};
   	meta_data_default = {
-  		$schema: $schema$4,
-  		$id: $id$4,
+  		$schema: $schema$5,
+  		$id: $id$5,
   		$vocabulary: $vocabulary$1,
   		$dynamicAnchor: $dynamicAnchor$1,
   		title: title$3,
@@ -6852,20 +6912,20 @@
   	};
   }));
   var validation_exports = /* @__PURE__ */ __exportAll({
-  	$defs: () => $defs,
+  	$defs: () => $defs$1,
   	$dynamicAnchor: () => $dynamicAnchor,
-  	$id: () => $id$3,
-  	$schema: () => $schema$3,
+  	$id: () => $id$4,
+  	$schema: () => $schema$4,
   	$vocabulary: () => $vocabulary,
   	default: () => validation_default,
   	properties: () => properties$3,
   	title: () => title$2,
   	type: () => type$3
   });
-  var $schema$3, $id$3, $vocabulary, $dynamicAnchor, title$2, type$3, properties$3, $defs, validation_default;
+  var $schema$4, $id$4, $vocabulary, $dynamicAnchor, title$2, type$3, properties$3, $defs$1, validation_default;
   var init_validation = __esmMin((() => {
-  	$schema$3 = "https://json-schema.org/draft/2020-12/schema";
-  	$id$3 = "https://json-schema.org/draft/2020-12/meta/validation";
+  	$schema$4 = "https://json-schema.org/draft/2020-12/schema";
+  	$id$4 = "https://json-schema.org/draft/2020-12/meta/validation";
   	$vocabulary = { "https://json-schema.org/draft/2020-12/vocab/validation": true };
   	$dynamicAnchor = "meta";
   	title$2 = "Validation vocabulary meta-schema";
@@ -6915,7 +6975,7 @@
   			"additionalProperties": { "$ref": "#/$defs/stringArray" }
   		}
   	};
-  	$defs = {
+  	$defs$1 = {
   		"nonNegativeInteger": {
   			"type": "integer",
   			"minimum": 0
@@ -6941,14 +7001,14 @@
   		}
   	};
   	validation_default = {
-  		$schema: $schema$3,
-  		$id: $id$3,
+  		$schema: $schema$4,
+  		$id: $id$4,
   		$vocabulary,
   		$dynamicAnchor,
   		title: title$2,
   		type: type$3,
   		properties: properties$3,
-  		$defs
+  		$defs: $defs$1
   	};
   }));
   var require_json_schema_2020_12 = /* @__PURE__ */ __commonJSMin(((exports) => {
@@ -7341,66 +7401,6 @@
   	Object.defineProperty(exports, "__esModule", { value: true });
   	exports.default = formatsPlugin;
   }));
-  var JsonSnapshotError = class extends Error {
-  	constructor(kind, dataPath) {
-  		super("JSON snapshot failed.");
-  		this.kind = kind;
-  		this.dataPath = dataPath;
-  	}
-  };
-  function appendPointer(path, key) {
-  	return `${path}/${key.replace(/~/g, "~0").replace(/\//g, "~1")}`;
-  }
-  /** Copy JSON values without invoking accessors, toJSON, or input iterators. */
-  function snapshotJson(value) {
-  	const active = /* @__PURE__ */ new WeakSet();
-  	let remaining = 1e5;
-  	const visit = (input, path, depth) => {
-  		if (--remaining < 0 || depth > 128) throw new JsonSnapshotError("limit", path);
-  		if (input === null || typeof input === "string" || typeof input === "boolean") return input;
-  		if (typeof input === "number" && Number.isFinite(input)) return input;
-  		if (typeof input !== "object" || input === null || active.has(input)) throw new JsonSnapshotError("invalid", path);
-  		const array = Array.isArray(input);
-  		const prototype = Object.getPrototypeOf(input);
-  		if (!array && prototype !== null && prototype !== Object.prototype) throw new JsonSnapshotError("invalid", path);
-  		if (Object.getOwnPropertySymbols(input).length) throw new JsonSnapshotError("invalid", path);
-  		active.add(input);
-  		try {
-  			if (array) {
-  				const length = input.length;
-  				if (!Number.isSafeInteger(length) || length > remaining) throw new JsonSnapshotError("limit", path);
-  				const result = [];
-  				for (let i = 0; i < length; i++) {
-  					const child = appendPointer(path, String(i));
-  					const descriptor = Object.getOwnPropertyDescriptor(input, i);
-  					if (!descriptor || !("value" in descriptor)) throw new JsonSnapshotError("invalid", child);
-  					result.push(visit(descriptor.value, child, depth + 1));
-  				}
-  				for (const key of Object.keys(input)) if (!/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= length) throw new JsonSnapshotError("invalid", appendPointer(path, key));
-  				return result;
-  			}
-  			const result = {};
-  			for (const key of Object.keys(input)) {
-  				const child = appendPointer(path, key);
-  				const descriptor = Object.getOwnPropertyDescriptor(input, key);
-  				if (!descriptor || !("value" in descriptor)) throw new JsonSnapshotError("invalid", child);
-  				Object.defineProperty(result, key, {
-  					value: visit(descriptor.value, child, depth + 1),
-  					enumerable: true,
-  					writable: true,
-  					configurable: true
-  				});
-  			}
-  			return result;
-  		} finally {
-  			active.delete(input);
-  		}
-  	};
-  	return visit(value, "", 0);
-  }
-  function isJsonRecord(value) {
-  	return value !== null && typeof value === "object" && !Array.isArray(value);
-  }
   var import_ajv = require_ajv();
   var import__2020 = require__2020();
   var import_dist = /* @__PURE__ */ __toESM(require_dist(), 1);
@@ -7744,6 +7744,310 @@
   			})])
   		});
   	}
+  }
+  var numberToken = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/u;
+  var invalidNumber = Object.freeze({
+  	kind: "invalid",
+  	code: "fixed-number-input-invalid"
+  });
+  /**
+  * Parse a NEW numeric draft according to NP-finite-new-input-v1.
+  * Never apply this to opening/no-op raw values or use it as an owner validator.
+  * Keep the validated token so negative zero, precision and exponent spelling survive.
+  */
+  function parseFixedNumberInput(input) {
+  	if (typeof input === "number") {
+  		if (!Number.isFinite(input)) return invalidNumber;
+  		return Object.freeze({
+  			kind: "valid",
+  			token: Object.is(input, -0) ? "-0" : String(input),
+  			value: input
+  		});
+  	}
+  	if (typeof input !== "string") return invalidNumber;
+  	const token = input.trim();
+  	if (!numberToken.test(token)) return invalidNumber;
+  	const value = Number(token);
+  	return Number.isFinite(value) ? Object.freeze({
+  		kind: "valid",
+  		token,
+  		value
+  	}) : invalidNumber;
+  }
+  var block_editor_fixed_inputs_schema_default = {
+  	$schema: "https://json-schema.org/draft/2020-12/schema",
+  	$id: "https://kubohiroya.github.io/turbowarp-time-space-sync/schemas/block-editor-fixed-inputs.schema.json",
+  	$defs: {
+  		"startOpticalTimeDecoder": {
+  			"type": "object",
+  			"properties": {
+  				"SECONDS": {
+  					"type": "number",
+  					"maximum": 60
+  				},
+  				"REFRESH_US": { "type": "number" }
+  			},
+  			"additionalProperties": false
+  		},
+  		"calibrateOpticalTimeDecoder": {
+  			"type": "object",
+  			"properties": { "SECONDS": {
+  				"type": "number",
+  				"maximum": 60
+  			} },
+  			"additionalProperties": false
+  		},
+  		"measurePatternCorners": {
+  			"type": "object",
+  			"properties": { "SECONDS": {
+  				"type": "number",
+  				"minimum": 1,
+  				"maximum": 60
+  			} },
+  			"additionalProperties": false
+  		},
+  		"patternReferenceJson": {
+  			"type": "object",
+  			"properties": {
+  				"SIGMA_METERS": {
+  					"type": "number",
+  					"minimum": 0
+  				},
+  				"MEASURED_BY": {
+  					"type": "string",
+  					"enum": [
+  						"tape",
+  						"laser",
+  						"nominal"
+  					]
+  				}
+  			},
+  			"additionalProperties": false
+  		}
+  	}
+  };
+  /** Canonical fixed field fragments; URI is identity only, never fetched. */
+  function fixedInputBundle(opcode, argument) {
+  	const source = {
+  		repository: "turbowarp-time-space-sync",
+  		path: "schemas/block-editor-fixed-inputs.schema.json",
+  		symbol: `#/$defs/${opcode}/properties/${argument}`
+  	};
+  	const definitions = block_editor_fixed_inputs_schema_default.$defs;
+  	return {
+  		identity: {
+  			ownerId: "turbowarp-time-space-sync",
+  			contractId: "fixed-inputs",
+  			revision: "1",
+  			variantId: opcode + "." + argument
+  		},
+  		dialect: "2020-12",
+  		root: {
+  			retrievalUri: block_editor_fixed_inputs_schema_default.$id,
+  			document: definitions[opcode].properties[argument],
+  			artifact: {
+  				role: "canonical-schema",
+  				source
+  			}
+  		},
+  		resources: [],
+  		provenance: {
+  			canonicalSources: [source, ...[
+  				{
+  					"repository": "turbowarp-time-space-sync",
+  					"path": "src/contracts/placement.ts",
+  					"symbol": "placementReferenceDefinition / referenceDefinitionIssues"
+  				},
+  				{
+  					"repository": "turbowarp-time-space-sync",
+  					"path": "src/placement/pattern-reference.ts",
+  					"symbol": "buildPatternReference"
+  				},
+  				{
+  					"repository": "turbowarp-time-space-sync",
+  					"path": "src/optical-time/controller.ts",
+  					"symbol": "start displayRefreshUs predicate"
+  				}
+  			]],
+  			generatedFiles: [{
+  				repository: "turbowarp-time-space-sync",
+  				path: "docs/schemas/block-editor-fixed-inputs.schema.json"
+  			}],
+  			generationSources: [{
+  				repository: "turbowarp-time-space-sync",
+  				path: "scripts/generate-fixed-input-docs.mjs"
+  			}],
+  			referenceSchemas: []
+  		}
+  	};
+  }
+  var invalid = () => [{ message: "Invalid fixed input." }];
+  function number(value) {
+  	if (typeof value !== "number" && typeof value !== "string" || typeof value === "string" && value.trim() === "") throw new TypeError("Unrepresentable numeric literal.");
+  	const result = Number(value);
+  	if (!Number.isFinite(result)) throw new TypeError("Nonfinite numeric literal.");
+  	return result;
+  }
+  function snapshotNumber(snapshot, argument) {
+  	const slot = snapshot.arguments[argument];
+  	if (slot?.kind !== "literal") throw new TypeError("A related literal is required.");
+  	return number(slot.value);
+  }
+  function snapshotText(snapshot, argument) {
+  	const slot = snapshot.arguments[argument];
+  	if (slot?.kind !== "literal" || typeof slot.value !== "string") throw new TypeError("A related literal is required.");
+  	return slot.value.trim();
+  }
+  function numericBinding(opcode, argument) {
+  	return {
+  		argument,
+  		schemaBundle: fixedInputBundle(opcode, argument),
+  		control: {
+  			label: argument,
+  			kind: "number"
+  		},
+  		read: number,
+  		encode(value) {
+  			const parsed = parseFixedNumberInput(value);
+  			if (parsed.kind !== "valid") throw new TypeError("Invalid numeric token.");
+  			return parsed.token;
+  		},
+  		validateCandidate(candidate, _context, finalSnapshot) {
+  			try {
+  				number(candidate);
+  				return ownerCheck(opcode, argument, candidate, finalSnapshot) ? [] : invalid();
+  			} catch {
+  				return invalid();
+  			}
+  		}
+  	};
+  }
+  function enumBinding(opcode, argument, choices, normalization) {
+  	const project = (value) => {
+  		if (typeof value !== "string") return value;
+  		const normalized = normalization === "none" ? value : normalization === "trim" ? value.trim() : value.trim().toLowerCase();
+  		return choices.includes(normalized) ? normalized : value;
+  	};
+  	return {
+  		argument,
+  		schemaBundle: fixedInputBundle(opcode, argument),
+  		control: {
+  			label: argument,
+  			kind: "enum",
+  			choices: choices.map((value) => ({ value }))
+  		},
+  		read: project,
+  		encode(value) {
+  			if (typeof value !== "string" || !choices.includes(value)) throw new TypeError("Choose a known value.");
+  			return value;
+  		},
+  		validateCandidate(candidate, _context, finalSnapshot) {
+  			try {
+  				return typeof candidate === "string" && choices.includes(candidate) && ownerCheck(opcode, argument, candidate, finalSnapshot) ? [] : invalid();
+  			} catch {
+  				return invalid();
+  			}
+  		}
+  	};
+  }
+  function ownerCheck(opcode, argument, candidate, snapshot) {
+  	if (argument === "REFRESH_US") {
+  		const rounded = Math.round(number(candidate));
+  		return Number.isFinite(rounded) && rounded > 0;
+  	}
+  	if (opcode === "patternReferenceJson" && (argument === "SIGMA_METERS" || argument === "MEASURED_BY")) {
+  		const sigma = argument === "SIGMA_METERS" ? number(candidate) : snapshotNumber(snapshot, "SIGMA_METERS");
+  		const measuredBy = argument === "MEASURED_BY" ? String(candidate).trim() : snapshotText(snapshot, "MEASURED_BY");
+  		return sigma >= 0 && [
+  			"tape",
+  			"laser",
+  			"nominal"
+  		].includes(measuredBy) && (measuredBy !== "nominal" || sigma > 0);
+  	}
+  	return true;
+  }
+  var extensionId = "kubohiroyatimespacesync";
+  var validationContext = () => ({
+  	consumerId: "turbowarp-time-space-sync",
+  	nowMs: 0,
+  	settings: null
+  });
+  var fixedInputEditors = [
+  	{
+  		apiVersion: 1,
+  		extensionId,
+  		editorId: "startOpticalTimeDecoder-fixed",
+  		opcodes: [`${extensionId}_startOpticalTimeDecoder`],
+  		contractId: "turbowarp-time-space-sync/startOpticalTimeDecoder",
+  		contractRevision: "1",
+  		validationContext,
+  		readOnlyArguments: [],
+  		bindings: [numericBinding("startOpticalTimeDecoder", "SECONDS"), numericBinding("startOpticalTimeDecoder", "REFRESH_US")]
+  	},
+  	{
+  		apiVersion: 1,
+  		extensionId,
+  		editorId: "calibrateOpticalTimeDecoder-fixed",
+  		opcodes: [`${extensionId}_calibrateOpticalTimeDecoder`],
+  		contractId: "turbowarp-time-space-sync/calibrateOpticalTimeDecoder",
+  		contractRevision: "1",
+  		validationContext,
+  		readOnlyArguments: [],
+  		bindings: [numericBinding("calibrateOpticalTimeDecoder", "SECONDS")]
+  	},
+  	{
+  		apiVersion: 1,
+  		extensionId,
+  		editorId: "measurePatternCorners-fixed",
+  		opcodes: [`${extensionId}_measurePatternCorners`],
+  		contractId: "turbowarp-time-space-sync/measurePatternCorners",
+  		contractRevision: "1",
+  		validationContext,
+  		readOnlyArguments: [],
+  		bindings: [numericBinding("measurePatternCorners", "SECONDS")]
+  	},
+  	{
+  		apiVersion: 1,
+  		extensionId,
+  		editorId: "patternReferenceJson-fixed",
+  		opcodes: [`${extensionId}_patternReferenceJson`],
+  		contractId: "turbowarp-time-space-sync/patternReferenceJson",
+  		contractRevision: "1",
+  		validationContext,
+  		readOnlyArguments: [],
+  		bindings: [numericBinding("patternReferenceJson", "SIGMA_METERS"), enumBinding("patternReferenceJson", "MEASURED_BY", [
+  			"tape",
+  			"laser",
+  			"nominal"
+  		], "trim")]
+  	}
+  ];
+  /** Register metadata only; the GUI startup capability owns editor activation. */
+  function registerFixedInputEditors(scratch, definitions, runtimeOverride) {
+  	const host = scratch;
+  	const api = host?.gui?.blockEditors;
+  	if (!definitions.length || api?.apiVersion !== 1 || typeof api.registerFixedInputEditor !== "function") return () => {};
+  	const runtime = runtimeOverride ?? host?.vm?.runtime;
+  	const removers = [];
+  	let active = true;
+  	const dispose = () => {
+  		if (!active) return;
+  		active = false;
+  		runtime?.off?.("RUNTIME_DISPOSED", dispose);
+  		for (const remove of removers.splice(0).reverse()) remove();
+  	};
+  	try {
+  		for (const definition of definitions) {
+  			const remove = api.registerFixedInputEditor.call(api, definition);
+  			if (typeof remove !== "function") throw new TypeError("Invalid fixed input registration disposer.");
+  			removers.push(remove);
+  		}
+  		runtime?.on?.("RUNTIME_DISPOSED", dispose);
+  	} catch (error) {
+  		dispose();
+  		throw error;
+  	}
+  	return dispose;
   }
   function deepFreeze(value) {
   	if (value !== null && typeof value === "object") {
@@ -13624,6 +13928,7 @@
   		this.placementObservations = [];
   		this.cameraModels = /* @__PURE__ */ new Map();
   		this.placementErrorCode = "";
+  		this.removeFixedEditors = () => {};
   		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
   		this.opticalTimeEnabled = options.opticalTimeEnabled ?? featureFlags.opticalTimeSyncV1;
   		this.placementEnabled = options.placementEnabled ?? featureFlags.placementSolveV1;
@@ -13637,9 +13942,17 @@
   		this.createFramePump = options.createFramePump;
   		this.createRegionReader = options.createRegionReader;
   		this.schedule = options.schedule;
-  		this.publishCapability();
   		this.removeSourceEditors = this.placementEnabled ? registerSourceEditors(Scratch) : () => {};
-  		this.watchRuntime();
+  		try {
+  			const visibleOpcodes = new Set(blockDefinitions.filter((block) => this.featureEnabled(block.feature)).map((block) => `${extensionConfig.id}_${block.opcode}`));
+  			this.removeFixedEditors = registerFixedInputEditors(typeof Scratch === "undefined" ? void 0 : Scratch, fixedInputEditors.filter((editor) => editor.opcodes.every((opcode) => visibleOpcodes.has(opcode))), this.runtime);
+  			this.publishCapability();
+  			this.watchRuntime();
+  		} catch (error) {
+  			this.removeFixedEditors();
+  			this.removeSourceEditors();
+  			throw error;
+  		}
   	}
   	getInfo() {
   		return {
@@ -14145,6 +14458,7 @@
   			"RUNTIME_DISPOSED"
   		]) this.runtime.on?.(event, event === "RUNTIME_DISPOSED" ? () => {
   			stop();
+  			this.removeFixedEditors();
   			this.removeSourceEditors();
   		} : stop);
   	}
