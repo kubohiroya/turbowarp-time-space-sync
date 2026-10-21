@@ -1,6 +1,6 @@
 {
   "name": "@kubohiroya/turbowarp-time-space-sync",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "時刻対応とカメラ配置の校正 for TurboWarp.",
   "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "license": "MPL-2.0",
@@ -91,13 +91,7 @@
     "react-dom": "18.3.1"
   },
   "dependencies": {
-    "@kubohiroya/turbowarp-camera-source": "0.17.1",
+    "@kubohiroya/turbowarp-camera-source": "0.19.0",
     "@kubohiroya/turbowarp-extension-data-editor": "0.2.1"
-  },
-  "gitHead": "429abd35dd2f43ba96a5523d822b37843ffd6f0a",
-  "x-turbowarp-source": {
-    "revision": "429abd35dd2f43ba96a5523d822b37843ffd6f0a",
-    "revisionRole": "base-commit",
-    "sourceState": "local-release-overlay"
   }
 }
