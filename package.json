@@ -80,8 +80,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@kubohiroya/turbowarp-extension-manifest": "0.3.2",
-    "@kubohiroya/vite-plugin-turbowarp-extension": "0.6.1",
+    "@kubohiroya/turbowarp-extension-manifest": "^0.3.2",
+    "@kubohiroya/vite-plugin-turbowarp-extension": "^0.6.1",
     "@types/node": "^24.13.3",
     "eslint": "^9.39.5",
     "typescript": "^5.9.3",
@@ -91,7 +91,7 @@
     "react-dom": "18.3.1"
   },
   "dependencies": {
-    "@kubohiroya/turbowarp-camera-source": "0.19.3",
-    "@kubohiroya/turbowarp-extension-data-editor": "0.2.1"
+    "@kubohiroya/turbowarp-camera-source": "^0.19.3",
+    "@kubohiroya/turbowarp-extension-data-editor": "^0.2.1"
   }
 }
