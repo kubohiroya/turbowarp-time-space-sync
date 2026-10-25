@@ -1,5 +1,7 @@
 # TurboWarp-Time-Space-Sync
 
+<img src="assets/block-icon.svg" alt="" width="48" height="48">
+
 [English](README.md) | **日本語**
 
 `turbowarp-extension-template` v0.4.0を元にした、時刻対応とカメラ配置校正のTurboWarp拡張です。光学時刻パターンの表示・復号と、実寸基準に対するカメラ配置のsolveを実装しています。`twtss.pattern.v2`では、投影した同じパターンの4隅を配置の基準としても使えます（`measure pattern corners for [SECONDS] seconds`でソース解像度のサブピクセル隅を測り、`pattern reference JSON`で壁上の実測値から基準を作ります）。
