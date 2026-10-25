@@ -2,7 +2,7 @@
 
 <img src="assets/block-icon.svg" alt="" width="48" height="48">
 
-[日本語](README.ja.md)
+English | [日本語](README.ja.md)
 
 Optical time correspondence and camera placement calibration for TurboWarp. This repository is based on `turbowarp-extension-template` v0.4.0.
 
