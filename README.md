@@ -117,11 +117,12 @@ Arrows indicate provider → consumer. This is a proposal; these integrations ar
 
 ## Requirements and safety
 
-Node.js >=22.18.0 and pnpm 11.11.0. The extension runs unsandboxed because it leases a camera through `turbowarp-camera-source` and draws a full screen overlay. Its only dependency is Camera Source, and only for the declarations describing a camera lease -- a handful of constants and one narrowing function, imported rather than copied so that a change on that side stops this build instead of surfacing in a browser. The corner measurement also reads Camera Source's calibration capability at runtime, when it is published, for the lens a camera's pixels were measured through. It does not bundle OpenCV.
+Node.js >=24 and pnpm 11.28.8. The extension runs unsandboxed because it leases a camera through `turbowarp-camera-source` and draws a full screen overlay. Its only dependency is Camera Source, and only for the declarations describing a camera lease -- a handful of constants and one narrowing function, imported rather than copied so that a change on that side stops this build instead of surfacing in a browser. The corner measurement also reads Camera Source's calibration capability at runtime, when it is published, for the lens a camera's pixels were measured through. It does not bundle OpenCV.
 
 ## Development
 
 ```bash
+npm install --global corepack@latest
 corepack enable
 pnpm install --frozen-lockfile
 pnpm run build
