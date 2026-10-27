@@ -1,0 +1,64 @@
+{
+  "baseURL": "https://kubohiroya.github.io/turbowarp-time-space-sync/",
+  "extension": {
+    "id": "kubohiroyatimespacesync",
+    "bundle": "dist/time-space-sync.js",
+    "unsandboxed": true,
+    "startupFlags": {
+      "__TWTSS_FEATURE_FLAGS__": {
+        "opticalTimeSyncV1": true,
+        "placementSolveV1": false
+      }
+    },
+    "dependencies": [
+      {
+        "id": "kubohiroyacamerasource",
+        "bundle": "samples/dependencies/camera-source.js",
+        "sha256": "a28ee94053abe0950afd7be49c2996b277c4a1b2ff86987257dde4210c6aa552"
+      }
+    ]
+  },
+  "assets": [],
+  "samples": [
+    {
+      "name": "optical-pattern-observation",
+      "title": "Optical time: manual hardware demo",
+      "instructions": "Display asks SHOW consent before flashing. Decode needs a second screen and camera.",
+      "checks": [
+        {
+          "variable": "sample-pattern",
+          "equals": false
+        },
+        {
+          "variable": "sample-decoder",
+          "equals": "idle"
+        },
+        {
+          "variable": "sample-count",
+          "equals": 0
+        },
+        {
+          "variable": "sample-error",
+          "equals": ""
+        },
+        {
+          "variable": "sample-profile",
+          "equals": "twtss.pattern.v2"
+        },
+        {
+          "variable": "sample-camera-active",
+          "equals": false
+        }
+      ],
+      "requirements": [
+        "表示側と撮影側の2端末・カメラ・実際の画面リフレッシュ周期",
+        "Camera Source関連拡張をID/SHA/license付き同梱",
+        "点滅開始前に利用者自身がSHOWを入力。既定OFFフラグは本体変更なし"
+      ],
+      "unverified": [
+        "実画面点滅とカメラ観測・時刻対応精度",
+        "実機camera decoder校正と観測率。自動検証は初期状態と表示同意のcancelのみ"
+      ]
+    }
+  ]
+}

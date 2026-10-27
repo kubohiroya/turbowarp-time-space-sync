@@ -6,6 +6,14 @@ English | [日本語](README.ja.md)
 
 Optical time correspondence and camera placement calibration for TurboWarp. This repository is based on `turbowarp-extension-template` v0.4.0.
 
+## Minimal demo
+
+[Open in TurboWarp Editor](https://turbowarp.org/editor?project_url=https%3A%2F%2Fkubohiroya.github.io%2Fturbowarp-time-space-sync%2Fsamples%2Foptical-pattern-observation.sb3) · [SB3](https://kubohiroya.github.io/turbowarp-time-space-sync/samples/optical-pattern-observation.sb3)
+
+Requires two physical screens/computers, a camera, HTTPS/permission, compatible exposure and matching pattern profile. Set Display refresh us in Stage code to the actual display interval (16667 is only a 60 Hz starting value). The decoder uses the extension minimum calibration duration. This sample explicitly enables only opticalTimeSyncV1 while constructing the embedded extension and restores host globals; package defaults remain OFF. Camera Source is embedded with revision/license/checksum. Tests cover idle, cancel, and stop only: flashing display, camera decoding/calibration, observation rate and time correspondence are unverified. No audio is used. Display consent is required every time; do not type SHOW for people who have not agreed. S/Stop hides the pattern and stops the decoder; Escape hides display.
+
+[Editable source and regeneration](samples/README.md)
+
 ## What it does
 
 Shows a time coded pattern on screen and decodes it back out of a camera, so a recorded frame can be placed against the moment the pattern was drawn. It also solves where cameras stand against a measured physical reference, and with the `twtss.pattern.v2` profile the same projected pattern serves as that reference.
