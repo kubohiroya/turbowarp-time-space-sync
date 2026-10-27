@@ -132,7 +132,7 @@ pnpm run test
 pnpm run repo:check
 ```
 
-Package identity: `@kubohiroya/turbowarp-time-space-sync@0.4.0`.
+Package identity: `@kubohiroya/turbowarp-time-space-sync@0.5.0`.
 Bundle: `dist/time-space-sync.js`. Contract: `dist/extension-manifest.json`.
 
 `pnpm run check` additionally checks generated files against Git.
