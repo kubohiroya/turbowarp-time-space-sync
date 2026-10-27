@@ -6,6 +6,10 @@ on:
     paths:
       - 'docs/**'
       - '.github/workflows/pages.yml'
+      - 'samples/**'
+      - 'dist/**'
+      - 'scripts/*samples.mjs'
+      - 'scripts/prepare-pages.mjs'
   workflow_dispatch:
 
 permissions:
@@ -25,10 +29,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/setup-node@v6
         with:
-          path: docs
+          node-version-file: .nvmrc
+      - name: Verify samples and prepare Pages
+        run: node scripts/prepare-pages.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

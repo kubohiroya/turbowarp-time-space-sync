@@ -1,7 +1,7 @@
 {
   "name": "@kubohiroya/turbowarp-time-space-sync",
   "version": "0.5.0",
-  "description": "時刻対応とカメラ配置の校正 for TurboWarp.",
+  "description": "\u6642\u523b\u5bfe\u5fdc\u3068\u30ab\u30e1\u30e9\u914d\u7f6e\u306e\u6821\u6b63 for TurboWarp.",
   "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
   "license": "MPL-2.0",
   "homepage": "https://github.com/kubohiroya/turbowarp-time-space-sync#readme",
@@ -74,10 +74,13 @@
     "template:readme": "node scripts/apply-readme-template.ts",
     "repo:check": "node scripts/check-repo.ts",
     "pack:check": "npm pack --dry-run --ignore-scripts",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run docs:check && pnpm run schemas:check && pnpm run fixtures:check && pnpm run check:dist && pnpm run repo:check && pnpm run pack:check",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run docs:check && pnpm run schemas:check && pnpm run fixtures:check && pnpm run check:dist && pnpm run repo:check && pnpm run pack:check && pnpm run samples:check",
     "check:dist": "pnpm run build && node scripts/check-dist.ts",
     "build:editor": "tsc -p tsconfig.editor.json",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "samples:build": "node scripts/build-samples.mjs",
+    "samples:check": "node scripts/build-samples.mjs --check && node --test scripts/verify-samples.mjs",
+    "pages:build": "node scripts/prepare-pages.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
