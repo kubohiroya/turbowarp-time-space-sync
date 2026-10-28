@@ -1,8 +1,12 @@
 {
   "name": "@kubohiroya/turbowarp-time-space-sync",
-  "version": "0.5.0",
-  "description": "\u6642\u523b\u5bfe\u5fdc\u3068\u30ab\u30e1\u30e9\u914d\u7f6e\u306e\u6821\u6b63 for TurboWarp.",
-  "author": "Hiroya Kubo <hiroya@cuc.ac.jp>",
+  "version": "0.6.0",
+  "description": "時刻対応とカメラ配置の校正 for TurboWarp.",
+  "author": {
+    "name": "Hiroya Kubo",
+    "email": "hiroya@cuc.ac.jp",
+    "url": "https://github.com/kubohiroya"
+  },
   "license": "MPL-2.0",
   "homepage": "https://github.com/kubohiroya/turbowarp-time-space-sync#readme",
   "repository": {
@@ -84,8 +88,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@kubohiroya/turbowarp-extension-manifest": "^0.4.0",
-    "@kubohiroya/vite-plugin-turbowarp-extension": "^0.9.0",
+    "@kubohiroya/turbowarp-extension-manifest": "^0.5.0",
+    "@kubohiroya/vite-plugin-turbowarp-extension": "^0.10.0",
     "@types/node": "^24.13.3",
     "eslint": "^9.39.5",
     "typescript": "^5.9.3",
@@ -95,7 +99,7 @@
     "react-dom": "18.3.1"
   },
   "dependencies": {
-    "@kubohiroya/turbowarp-camera-source": "^0.21.0",
-    "@kubohiroya/turbowarp-extension-data-editor": "^0.4.0"
+    "@kubohiroya/turbowarp-camera-source": "^0.22.0",
+    "@kubohiroya/turbowarp-extension-data-editor": "^0.5.0"
   }
 }
