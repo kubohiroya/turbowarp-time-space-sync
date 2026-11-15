@@ -103,3 +103,26 @@ it('preserves headless construction with an injected runtime and both startup fe
  try {expect(()=>new TimeSpaceSyncExtension({runtime:{on:()=>{},off:()=>{}},opticalTimeEnabled:false,placementEnabled:false})).not.toThrow();}
  finally {vi.unstubAllGlobals();}
 });
+it('registers the editors again for each project the extension stays loaded for',()=>{
+ // Every project load disposes the runtime, which releases the registrations, but keeps the extension loaded.
+ const fixedRemoves:Array<ReturnType<typeof vi.fn>>=[];const sourceRemoves:Array<ReturnType<typeof vi.fn>>=[];
+ const registerFixedInputEditor=vi.fn(()=>{const remove=vi.fn();fixedRemoves.push(remove);return remove;});
+ const registerSourceEditor=vi.fn(()=>{const remove=vi.fn();sourceRemoves.push(remove);return remove;});
+ const host=scratchHost({apiVersion:1,registerFixedInputEditor,registerSourceEditor});vi.stubGlobal('Scratch',host);
+ const emit=(event:string)=>{for(const f of [...host.callbacks.get(event)??[]])f();};
+ try {
+  new TimeSpaceSyncExtension({opticalTimeEnabled:true,placementEnabled:true});const fixedCount=registerFixedInputEditor.mock.calls.length;const sourceCount=registerSourceEditor.mock.calls.length;
+  expect(fixedCount).toBeGreaterThan(0);expect(sourceCount).toBeGreaterThan(0);
+  emit('RUNTIME_DISPOSED');
+  for(const remove of [...fixedRemoves,...sourceRemoves])expect(remove).toHaveBeenCalledTimes(1);
+  emit('PROJECT_LOADED');
+  expect(registerFixedInputEditor).toHaveBeenCalledTimes(fixedCount*2);expect(registerSourceEditor).toHaveBeenCalledTimes(sourceCount*2);
+  for(const remove of [...fixedRemoves.slice(fixedCount),...sourceRemoves.slice(sourceCount)])expect(remove).not.toHaveBeenCalled();
+  emit('PROJECT_LOADED');
+  expect(registerFixedInputEditor).toHaveBeenCalledTimes(fixedCount*2);expect(registerSourceEditor).toHaveBeenCalledTimes(sourceCount*2);
+  emit('RUNTIME_DISPOSED');
+  for(const remove of [...fixedRemoves,...sourceRemoves])expect(remove).toHaveBeenCalledTimes(1);
+  emit('PROJECT_LOADED');
+  expect(registerFixedInputEditor).toHaveBeenCalledTimes(fixedCount*3);expect(registerSourceEditor).toHaveBeenCalledTimes(sourceCount*3);
+ } finally {vi.unstubAllGlobals();}
+});

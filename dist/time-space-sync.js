@@ -15194,7 +15194,20 @@ var TimeSpaceSyncExtension = class {
 		this.placementObservations = [];
 		this.cameraModels = /* @__PURE__ */ new Map();
 		this.placementErrorCode = "";
+		this.removeSourceEditors = () => {};
 		this.removeFixedEditors = () => {};
+		this.editorsReleased = false;
+		this.restoreEditors = () => {
+			if (!this.editorsReleased) return;
+			this.editorsReleased = false;
+			try {
+				this.registerEditors();
+			} catch (error) {
+				this.removeEditors();
+				this.editorsReleased = true;
+				throw error;
+			}
+		};
 		this.runtime = options.runtime ?? Scratch.vm?.runtime ?? {};
 		this.opticalTimeEnabled = options.opticalTimeEnabled ?? featureFlags.opticalTimeSyncV1;
 		this.placementEnabled = options.placementEnabled ?? featureFlags.placementSolveV1;
@@ -15208,17 +15221,23 @@ var TimeSpaceSyncExtension = class {
 		this.createFramePump = options.createFramePump;
 		this.createRegionReader = options.createRegionReader;
 		this.schedule = options.schedule;
-		this.removeSourceEditors = this.placementEnabled ? registerSourceEditors(Scratch) : () => {};
 		try {
-			const visibleOpcodes = new Set(blockDefinitions.filter((block) => this.featureEnabled(block.feature)).map((block) => `${extensionConfig.id}_${block.opcode}`));
-			this.removeFixedEditors = registerFixedInputEditors(typeof Scratch === "undefined" ? void 0 : Scratch, fixedInputEditors.filter((editor) => editor.opcodes.every((opcode) => visibleOpcodes.has(opcode))), this.runtime);
+			this.registerEditors();
 			this.publishCapability();
 			this.watchRuntime();
 		} catch (error) {
-			this.removeFixedEditors();
-			this.removeSourceEditors();
+			this.removeEditors();
 			throw error;
 		}
+	}
+	registerEditors() {
+		this.removeSourceEditors = this.placementEnabled ? registerSourceEditors(Scratch) : () => {};
+		const visibleOpcodes = new Set(blockDefinitions.filter((block) => this.featureEnabled(block.feature)).map((block) => `${extensionConfig.id}_${block.opcode}`));
+		this.removeFixedEditors = registerFixedInputEditors(typeof Scratch === "undefined" ? void 0 : Scratch, fixedInputEditors.filter((editor) => editor.opcodes.every((opcode) => visibleOpcodes.has(opcode))), this.runtime);
+	}
+	removeEditors() {
+		this.removeFixedEditors();
+		this.removeSourceEditors();
 	}
 	getInfo() {
 		return {
@@ -15718,15 +15737,19 @@ var TimeSpaceSyncExtension = class {
 			this.clearPlacement();
 			this.acknowledgement = void 0;
 		};
-		for (const event of [
-			"PROJECT_STOP_ALL",
-			"PROJECT_LOADED",
-			"RUNTIME_DISPOSED"
-		]) this.runtime.on?.(event, event === "RUNTIME_DISPOSED" ? () => {
-			stop();
-			this.removeFixedEditors();
-			this.removeSourceEditors();
-		} : stop);
+		const listeners = {
+			PROJECT_STOP_ALL: stop,
+			PROJECT_LOADED: () => {
+				stop();
+				this.restoreEditors();
+			},
+			RUNTIME_DISPOSED: () => {
+				stop();
+				this.removeEditors();
+				this.editorsReleased = true;
+			}
+		};
+		for (const [event, listener] of Object.entries(listeners)) this.runtime.on?.(event, listener);
 	}
 	toScratchBlock(block) {
 		return {
