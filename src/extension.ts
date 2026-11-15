@@ -141,8 +141,24 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
   private placement: PlacementResult | undefined;
   private placementErrorCode = '';
 
-  private readonly removeSourceEditors: () => void;
+  private removeSourceEditors: () => void = () => {};
   private removeFixedEditors: () => void = () => {};
+  /**
+   * Loading a project disposes the runtime, which releases the editor registrations, but the
+   * extension stays loaded for the next project. Register them again once that project has loaded.
+   */
+  private editorsReleased = false;
+  private readonly restoreEditors = (): void => {
+    if (!this.editorsReleased) return;
+    this.editorsReleased = false;
+    try {
+      this.registerEditors();
+    } catch (error) {
+      this.removeEditors();
+      this.editorsReleased = true;
+      throw error;
+    }
+  };
 
   public constructor(options: TimeSpaceSyncExtensionOptions = {}) {
     this.runtime = options.runtime ?? Scratch.vm?.runtime ?? ({} as TurboWarpRuntime);
@@ -158,18 +174,26 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
     this.createFramePump = options.createFramePump;
     this.createRegionReader = options.createRegionReader;
     this.schedule = options.schedule;
-    this.removeSourceEditors = this.placementEnabled ? registerSourceEditors(Scratch) : () => {};
     try {
-      const visibleOpcodes = new Set(blockDefinitions.filter(block => this.featureEnabled(block.feature)).map(block => `${extensionConfig.id}_${block.opcode}`));
-      this.removeFixedEditors = registerFixedInputEditors(typeof Scratch === 'undefined' ? undefined : Scratch,
-        fixedInputEditors.filter(editor => editor.opcodes.every(opcode => visibleOpcodes.has(opcode))), this.runtime);
+      this.registerEditors();
       this.publishCapability();
       this.watchRuntime();
     } catch (error) {
-      this.removeFixedEditors();
-      this.removeSourceEditors();
+      this.removeEditors();
       throw error;
     }
+  }
+
+  private registerEditors(): void {
+    this.removeSourceEditors = this.placementEnabled ? registerSourceEditors(Scratch) : () => {};
+    const visibleOpcodes = new Set(blockDefinitions.filter(block => this.featureEnabled(block.feature)).map(block => `${extensionConfig.id}_${block.opcode}`));
+    this.removeFixedEditors = registerFixedInputEditors(typeof Scratch === 'undefined' ? undefined : Scratch,
+      fixedInputEditors.filter(editor => editor.opcodes.every(opcode => visibleOpcodes.has(opcode))), this.runtime);
+  }
+
+  private removeEditors(): void {
+    this.removeFixedEditors();
+    this.removeSourceEditors();
   }
 
   public getInfo(): Record<string, unknown> {
@@ -812,13 +836,20 @@ export class TimeSpaceSyncExtension implements TurboWarpExtension {
       this.clearPlacement();
       this.acknowledgement = undefined;
     };
-    for (const event of ['PROJECT_STOP_ALL', 'PROJECT_LOADED', 'RUNTIME_DISPOSED']) {
-      this.runtime.on?.(event, event === 'RUNTIME_DISPOSED' ? () => {
+    // Nothing disposes this extension for good, so the editors come back with every project.
+    const listeners: Record<string, () => void> = {
+      PROJECT_STOP_ALL: stop,
+      PROJECT_LOADED: () => {
         stop();
-        this.removeFixedEditors();
-        this.removeSourceEditors();
-      } : stop);
-    }
+        this.restoreEditors();
+      },
+      RUNTIME_DISPOSED: () => {
+        stop();
+        this.removeEditors();
+        this.editorsReleased = true;
+      }
+    };
+    for (const [event, listener] of Object.entries(listeners)) this.runtime.on?.(event, listener);
   }
 
   private toScratchBlock(block: BlockDefinition): Record<string, unknown> {
