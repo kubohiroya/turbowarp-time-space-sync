@@ -1,6 +1,6 @@
 {
   "name": "@kubohiroya/turbowarp-time-space-sync",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "時刻対応とカメラ配置の校正 for TurboWarp.",
   "author": {
     "name": "Hiroya Kubo",
