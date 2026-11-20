@@ -1,6 +1,6 @@
 {
   "name": "@kubohiroya/turbowarp-time-space-sync",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "時刻対応とカメラ配置の校正 for TurboWarp.",
   "author": {
     "name": "Hiroya Kubo",
@@ -101,5 +101,27 @@
   "dependencies": {
     "@kubohiroya/turbowarp-camera-source": "^0.24.0",
     "@kubohiroya/turbowarp-extension-data-editor": "^0.11.0"
+  },
+  "turbowarpExtension": {
+    "resourceDeclaration": {
+      "schemaVersion": 1,
+      "resources": [
+        {
+          "type": "camera",
+          "usage": "conditional",
+          "purpose": {
+            "en": "Observe timing patterns and measure camera placement",
+            "ja": "時刻パターンを撮影し、カメラの配置を測定する"
+          },
+          "condition": {
+            "en": "When the optical observation or placement feature is enabled at startup and used; both are off by default",
+            "ja": "既定OFFの光学観測・配置校正機能を起動時に有効にし、撮影機能を使う場合"
+          },
+          "via": [
+            "@kubohiroya/turbowarp-camera-source"
+          ]
+        }
+      ]
+    }
   }
 }
