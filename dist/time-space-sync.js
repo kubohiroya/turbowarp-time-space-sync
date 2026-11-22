@@ -7148,8 +7148,10 @@ var require_formats = /* @__PURE__ */ __commonJSMin(((exports) => {
 	}
 	exports.fullFormats = {
 		date: fmtDef(date, compareDate),
-		time: fmtDef(time, compareTime),
-		"date-time": fmtDef(date_time, compareDateTime),
+		time: fmtDef(getTime(true), compareTime),
+		"date-time": fmtDef(getDateTime(true), compareDateTime),
+		"iso-time": fmtDef(getTime(), compareIsoTime),
+		"iso-date-time": fmtDef(getDateTime(), compareIsoDateTime),
 		duration: /^P(?!$)((\d+Y)?(\d+M)?(\d+D)?(T(?=\d)(\d+H)?(\d+M)?(\d+S)?)?|(\d+W)?)$/,
 		uri,
 		"uri-reference": /^(?:[a-z][a-z0-9+\-.]*:)?(?:\/?\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:]|%[0-9a-f]{2})*@)?(?:\[(?:(?:(?:(?:[0-9a-f]{1,4}:){6}|::(?:[0-9a-f]{1,4}:){5}|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}|(?:(?:[0-9a-f]{1,4}:){0,1}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::)(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?))|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|[Vv][0-9a-f]+\.[a-z0-9\-._~!$&'()*+,;=:]+)\]|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)|(?:[a-z0-9\-._~!$&'"()*+,;=]|%[0-9a-f]{2})*)(?::\d*)?(?:\/(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})*)*|\/(?:(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})*)*)?|(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})*)*)?(?:\?(?:[a-z0-9\-._~!$&'"()*+,;=:@/?]|%[0-9a-f]{2})*)?(?:#(?:[a-z0-9\-._~!$&'"()*+,;=:@/?]|%[0-9a-f]{2})*)?$/i,
@@ -7157,7 +7159,7 @@ var require_formats = /* @__PURE__ */ __commonJSMin(((exports) => {
 		url: /^(?:https?|ftp):\/\/(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z0-9\u{00a1}-\u{ffff}]+-)*[a-z0-9\u{00a1}-\u{ffff}]+)(?:\.(?:[a-z0-9\u{00a1}-\u{ffff}]+-)*[a-z0-9\u{00a1}-\u{ffff}]+)*(?:\.(?:[a-z\u{00a1}-\u{ffff}]{2,})))(?::\d{2,5})?(?:\/[^\s]*)?$/iu,
 		email: /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i,
 		hostname: /^(?=.{1,253}\.?$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[-0-9a-z]{0,61}[0-9a-z])?)*\.?$/i,
-		ipv4: /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/,
+		ipv4: /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/,
 		ipv6: /^((([0-9a-f]{1,4}:){7}([0-9a-f]{1,4}|:))|(([0-9a-f]{1,4}:){6}(:[0-9a-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){5}(((:[0-9a-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){4}(((:[0-9a-f]{1,4}){1,3})|((:[0-9a-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){3}(((:[0-9a-f]{1,4}){1,4})|((:[0-9a-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){2}(((:[0-9a-f]{1,4}){1,5})|((:[0-9a-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){1}(((:[0-9a-f]{1,4}){1,6})|((:[0-9a-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9a-f]{1,4}){1,7})|((:[0-9a-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))$/i,
 		regex,
 		uuid: /^(?:urn:uuid:)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i,
@@ -7187,8 +7189,10 @@ var require_formats = /* @__PURE__ */ __commonJSMin(((exports) => {
 	exports.fastFormats = {
 		...exports.fullFormats,
 		date: fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\d$/, compareDate),
-		time: fmtDef(/^(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)?$/i, compareTime),
-		"date-time": fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\d[t\s](?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)$/i, compareDateTime),
+		time: fmtDef(/^(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)$/i, compareTime),
+		"date-time": fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\dt(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)$/i, compareDateTime),
+		"iso-time": fmtDef(/^(?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)?$/i, compareIsoTime),
+		"iso-date-time": fmtDef(/^\d\d\d\d-[0-1]\d-[0-3]\d[t\s](?:[0-2]\d:[0-5]\d:[0-5]\d|23:59:60)(?:\.\d+)?(?:z|[+-]\d\d(?::?\d\d)?)?$/i, compareIsoDateTime),
 		uri: /^(?:[a-z][a-z0-9+\-.]*:)(?:\/?\/)?[^\s]*$/i,
 		"uri-reference": /^(?:(?:[a-z][a-z0-9+\-.]*:)?\/?\/)?(?:[^\\\s#][^\s#]*)?(?:#[^\\\s]*)?$/i,
 		email: /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i
@@ -7227,33 +7231,59 @@ var require_formats = /* @__PURE__ */ __commonJSMin(((exports) => {
 		if (d1 < d2) return -1;
 		return 0;
 	}
-	var TIME = /^(\d\d):(\d\d):(\d\d)(\.\d+)?(z|[+-]\d\d(?::?\d\d)?)?$/i;
-	function time(str, withTimeZone) {
-		const matches = TIME.exec(str);
-		if (!matches) return false;
-		const hour = +matches[1];
-		const minute = +matches[2];
-		const second = +matches[3];
-		const timeZone = matches[5];
-		return (hour <= 23 && minute <= 59 && second <= 59 || hour === 23 && minute === 59 && second === 60) && (!withTimeZone || timeZone !== "");
+	var TIME = /^(\d\d):(\d\d):(\d\d(?:\.\d+)?)(z|([+-])(\d\d)(?::?(\d\d))?)?$/i;
+	function getTime(strictTimeZone) {
+		return function time(str) {
+			const matches = TIME.exec(str);
+			if (!matches) return false;
+			const hr = +matches[1];
+			const min = +matches[2];
+			const sec = +matches[3];
+			const tz = matches[4];
+			const tzSign = matches[5] === "-" ? -1 : 1;
+			const tzH = +(matches[6] || 0);
+			const tzM = +(matches[7] || 0);
+			if (tzH > 23 || tzM > 59 || strictTimeZone && !tz) return false;
+			if (hr <= 23 && min <= 59 && sec < 60) return true;
+			const utcMin = min - tzM * tzSign;
+			const utcHr = hr - tzH * tzSign - (utcMin < 0 ? 1 : 0);
+			return (utcHr === 23 || utcHr === -1) && (utcMin === 59 || utcMin === -1) && sec < 61;
+		};
 	}
-	function compareTime(t1, t2) {
+	function compareTime(s1, s2) {
+		if (!(s1 && s2)) return void 0;
+		const t1 = (/* @__PURE__ */ new Date("2020-01-01T" + s1)).valueOf();
+		const t2 = (/* @__PURE__ */ new Date("2020-01-01T" + s2)).valueOf();
+		if (!(t1 && t2)) return void 0;
+		return t1 - t2;
+	}
+	function compareIsoTime(t1, t2) {
 		if (!(t1 && t2)) return void 0;
 		const a1 = TIME.exec(t1);
 		const a2 = TIME.exec(t2);
 		if (!(a1 && a2)) return void 0;
-		t1 = a1[1] + a1[2] + a1[3] + (a1[4] || "");
-		t2 = a2[1] + a2[2] + a2[3] + (a2[4] || "");
+		t1 = a1[1] + a1[2] + a1[3];
+		t2 = a2[1] + a2[2] + a2[3];
 		if (t1 > t2) return 1;
 		if (t1 < t2) return -1;
 		return 0;
 	}
 	var DATE_TIME_SEPARATOR = /t|\s/i;
-	function date_time(str) {
-		const dateTime = str.split(DATE_TIME_SEPARATOR);
-		return dateTime.length === 2 && date(dateTime[0]) && time(dateTime[1], true);
+	function getDateTime(strictTimeZone) {
+		const time = getTime(strictTimeZone);
+		return function date_time(str) {
+			const dateTime = str.split(DATE_TIME_SEPARATOR);
+			return dateTime.length === 2 && date(dateTime[0]) && time(dateTime[1]);
+		};
 	}
 	function compareDateTime(dt1, dt2) {
+		if (!(dt1 && dt2)) return void 0;
+		const d1 = new Date(dt1).valueOf();
+		const d2 = new Date(dt2).valueOf();
+		if (!(d1 && d2)) return void 0;
+		return d1 - d2;
+	}
+	function compareIsoDateTime(dt1, dt2) {
 		if (!(dt1 && dt2)) return void 0;
 		const [d1, t1] = dt1.split(DATE_TIME_SEPARATOR);
 		const [d2, t2] = dt2.split(DATE_TIME_SEPARATOR);
@@ -7327,8 +7357,8 @@ var require_limit = /* @__PURE__ */ __commonJSMin(((exports) => {
 		schemaType: "string",
 		$data: true,
 		error: {
-			message: ({ keyword, schemaCode }) => codegen_1.str`should be ${KWDs[keyword].okStr} ${schemaCode}`,
-			params: ({ keyword, schemaCode }) => codegen_1._`{comparison: ${KWDs[keyword].okStr}, limit: ${schemaCode}}`
+			message: ({ keyword, schemaCode }) => (0, codegen_1.str)`should be ${KWDs[keyword].okStr} ${schemaCode}`,
+			params: ({ keyword, schemaCode }) => (0, codegen_1._)`{comparison: ${KWDs[keyword].okStr}, limit: ${schemaCode}}`
 		},
 		code(cxt) {
 			const { gen, data, schemaCode, keyword, it } = cxt;
@@ -7342,8 +7372,8 @@ var require_limit = /* @__PURE__ */ __commonJSMin(((exports) => {
 					ref: self.formats,
 					code: opts.code.formats
 				});
-				const fmt = gen.const("fmt", codegen_1._`${fmts}[${fCxt.schemaCode}]`);
-				cxt.fail$data(codegen_1.or(codegen_1._`typeof ${fmt} != "object"`, codegen_1._`${fmt} instanceof RegExp`, codegen_1._`typeof ${fmt}.compare != "function"`, compareCode(fmt)));
+				const fmt = gen.const("fmt", (0, codegen_1._)`${fmts}[${fCxt.schemaCode}]`);
+				cxt.fail$data((0, codegen_1.or)((0, codegen_1._)`typeof ${fmt} != "object"`, (0, codegen_1._)`${fmt} instanceof RegExp`, (0, codegen_1._)`typeof ${fmt}.compare != "function"`, compareCode(fmt)));
 			}
 			function validateFormat() {
 				const format = fCxt.schema;
@@ -7353,12 +7383,12 @@ var require_limit = /* @__PURE__ */ __commonJSMin(((exports) => {
 				const fmt = gen.scopeValue("formats", {
 					key: format,
 					ref: fmtDef,
-					code: opts.code.formats ? codegen_1._`${opts.code.formats}${codegen_1.getProperty(format)}` : void 0
+					code: opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(format)}` : void 0
 				});
 				cxt.fail$data(compareCode(fmt));
 			}
 			function compareCode(fmt) {
-				return codegen_1._`${fmt}.compare(${data}, ${schemaCode}) ${KWDs[keyword].fail} 0`;
+				return (0, codegen_1._)`${fmt}.compare(${data}, ${schemaCode}) ${KWDs[keyword].fail} 0`;
 			}
 		},
 		dependencies: ["format"]
@@ -7383,7 +7413,7 @@ var require_dist = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		}
 		const [formats, exportName] = opts.mode === "fast" ? [formats_1.fastFormats, fastName] : [formats_1.fullFormats, fullName];
 		addFormats(ajv, opts.formats || formats_1.formatNames, formats, exportName);
-		if (opts.keywords) limit_1.default(ajv);
+		if (opts.keywords) (0, limit_1.default)(ajv);
 		return ajv;
 	};
 	formatsPlugin.get = (name, mode = "full") => {
@@ -7394,7 +7424,7 @@ var require_dist = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	function addFormats(ajv, list, fs, exportName) {
 		var _a;
 		var _b;
-		(_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 || (_b.formats = codegen_1._`require("ajv-formats/dist/formats").${exportName}`);
+		(_a = (_b = ajv.opts.code).formats) !== null && _a !== void 0 || (_b.formats = (0, codegen_1._)`require("ajv-formats/dist/formats").${exportName}`);
 		for (const f of list) ajv.addFormat(f, fs[f]);
 	}
 	module.exports = exports = formatsPlugin;
@@ -7418,16 +7448,10 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	var isQueryFragmentCharacter = RegExp.prototype.test.bind(/^[A-Za-z0-9\-._~!$&'()*+,;=:@/?]$/u);
 	/** @type {(value: string) => boolean} */
 	var isUserinfoCharacter = RegExp.prototype.test.bind(/^[A-Za-z0-9\-._~!$&'()*+,;=:]$/u);
-	var BYTE_HEX = new Array(256);
-	{
-		const HEX_DIGITS = "0123456789ABCDEF";
-		for (let i = 0; i < 256; i++) BYTE_HEX[i] = "%" + HEX_DIGITS[i >> 4] + HEX_DIGITS[i & 15];
-	}
-	function percentEncodeNonAscii(cp) {
-		if (cp < 2048) return BYTE_HEX[192 | cp >> 6] + BYTE_HEX[128 | cp & 63];
-		if (cp < 65536) return BYTE_HEX[224 | cp >> 12] + BYTE_HEX[128 | cp >> 6 & 63] + BYTE_HEX[128 | cp & 63];
-		return BYTE_HEX[240 | cp >> 18] + BYTE_HEX[128 | cp >> 12 & 63] + BYTE_HEX[128 | cp >> 6 & 63] + BYTE_HEX[128 | cp & 63];
-	}
+	/** @type {(value: string) => boolean} */
+	var isRegNameCharacter = RegExp.prototype.test.bind(/^[A-Za-z0-9\-._~!$&'()*+,;=]$/u);
+	/** @type {(value: string) => boolean} */
+	var isLiteralRegName = RegExp.prototype.test.bind(/^[A-Za-z0-9\-._~!$&'()*+,;=]*$/u);
 	/**
 	* @param {Array<string>} input
 	* @returns {string}
@@ -7461,6 +7485,27 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	* @returns {boolean}
 	*/
 	var nonSimpleDomain = RegExp.prototype.test.bind(/[^!"$&'()*+,\-.;=_`a-z{}~]/u);
+	/** @type {(value: string) => boolean} */
+	var nonSimpleDomainChars = RegExp.prototype.test.bind(/[^\d!"$&'()*+,\-.;=_`a-z{}~]/u);
+	/** @type {(value: string) => boolean} */
+	var numericLastLabel = RegExp.prototype.test.bind(/(?:^|\.)\d+$/u);
+	/**
+	* True when `new URL('http://' + domain).hostname` may differ from `domain`,
+	* i.e. when the caller must fall back to the WHATWG parser.
+	*
+	* Same purpose as `nonSimpleDomain`, but digits are allowed: for this character
+	* set `hostname` is the identity, *except* that an all-numeric final label is
+	* read as IPv4 shorthand ("1.2.3" -> "1.2.0.3", "127.1" -> "127.0.0.1",
+	* "a.b.1" throws), which is why `nonSimpleDomain` excludes digits outright.
+	* Rejecting that one shape lets the common `mail2.example.org` case stay on the
+	* fast path.
+	*
+	* @param {string} domain - must already be lowercased
+	* @returns {boolean}
+	*/
+	function nonSimpleMailtoDomain(domain) {
+		return nonSimpleDomainChars(domain) || numericLastLabel(domain);
+	}
 	/**
 	* @param {string} zone
 	* @returns {boolean}
@@ -7647,7 +7692,7 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 						continue;
 					}
 				} else if (input[0] === "/") {
-					if (input[1] === "." || input[1] === "/") {
+					if (input[1] === ".") {
 						output.push("/");
 						break;
 					}
@@ -7726,28 +7771,30 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		return output.join("/");
 	}
 	/**
-	* Re-escape RFC 3986 gen-delims that must not appear literally in the host.
-	* After the URI regex parses, these characters cannot be literal in the host
-	* field, so any that appear after decoding came from percent-encoding and
-	* must be restored to prevent authority structure changes.
+	* Encodes a host according to the RFC 3986 host grammar. Valid IP literals
+	* have already been checked by `normalizeIPv6`, so their address separators
+	* remain literal. Every other host is a reg-name and may contain only
+	* unreserved characters, sub-delimiters, and valid percent escapes.
 	*
 	* @param {string} host
-	* @param {boolean} isIP - true for IPv4/IPv6 hosts (skip colon re-escaping)
+	* @param {boolean} isIP - true for a validated IPv4/IPv6 host
+	* @param {boolean} [allowNonAscii=false] - preserve non-ASCII IRI characters
 	* @returns {string}
 	*/
-	var HOST_DELIMS = {
+	var IP_HOST_DELIMS = {
 		"@": "%40",
 		"/": "%2F",
 		"?": "%3F",
-		"#": "%23",
-		":": "%3A"
+		"#": "%23"
 	};
-	var HOST_DELIM_RE = /[@/?#:]/g;
-	var HOST_DELIM_NO_COLON_RE = /[@/?#]/g;
-	function reescapeHostDelimiters(host, isIP) {
-		const re = isIP ? HOST_DELIM_NO_COLON_RE : HOST_DELIM_RE;
-		re.lastIndex = 0;
-		return host.replace(re, (ch) => HOST_DELIMS[ch]);
+	var IP_HOST_DELIM_RE = /[@/?#]/g;
+	function encodeHost(host, isIP, allowNonAscii = false) {
+		if (!isIP) {
+			if (isLiteralRegName(host)) return host;
+			return encodeComponent(host, isRegNameCharacter, allowNonAscii);
+		}
+		IP_HOST_DELIM_RE.lastIndex = 0;
+		return host.replace(IP_HOST_DELIM_RE, (ch) => IP_HOST_DELIMS[ch]);
 	}
 	/**
 	* Normalizes percent escapes and optionally decodes only unreserved ASCII bytes.
@@ -7775,6 +7822,34 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			output += input[i];
 		}
 		return output;
+	}
+	/** Pre-built `%XX` strings for every byte. Avoids per-call hex math/concat. */
+	var BYTE_HEX = new Array(256);
+	{
+		const HEX_DIGITS = "0123456789ABCDEF";
+		for (let i = 0; i < 256; i++) BYTE_HEX[i] = "%" + HEX_DIGITS[i >> 4] + HEX_DIGITS[i & 15];
+	}
+	/**
+	* Mirrors the pass-through set of the deprecated `escape()` global:
+	* `A-Z a-z 0-9 * + - . / @ _`. Keeps drop-in semantics for ASCII input.
+	*
+	* @param {number} cp
+	* @returns {boolean}
+	*/
+	function isEscapeSafe(cp) {
+		return cp >= 48 && cp <= 57 || cp >= 65 && cp <= 90 || cp >= 97 && cp <= 122 || cp === 42 || cp === 43 || cp === 45 || cp === 46 || cp === 47 || cp === 64 || cp === 95;
+	}
+	/**
+	* RFC 3986 percent-encode a non-ASCII Unicode code point as UTF-8 bytes.
+	* Caller handles the ASCII branch inline for speed.
+	*
+	* @param {number} cp - Unicode code point (>= 0x80, <= 0x10FFFF)
+	* @returns {string}
+	*/
+	function percentEncodeNonAscii(cp) {
+		if (cp < 2048) return BYTE_HEX[192 | cp >> 6] + BYTE_HEX[128 | cp & 63];
+		if (cp < 65536) return BYTE_HEX[224 | cp >> 12] + BYTE_HEX[128 | cp >> 6 & 63] + BYTE_HEX[128 | cp & 63];
+		return BYTE_HEX[240 | cp >> 18] + BYTE_HEX[128 | cp >> 12 & 63] + BYTE_HEX[128 | cp >> 6 & 63] + BYTE_HEX[128 | cp & 63];
 	}
 	/**
 	* Normalizes path data without turning reserved escapes into live path syntax.
@@ -7856,74 +7931,6 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		return output;
 	}
 	/**
-	* Percent-encodes a URI component using its RFC 3986 literal character set.
-	* Existing valid escapes are preserved and normalized to uppercase hex.
-	*
-	* @param {string} input
-	* @param {(value: string) => boolean} isAllowed
-	* @returns {string}
-	*/
-	function encodeComponent(input, isAllowed) {
-		let output = "";
-		for (let i = 0; i < input.length; i++) {
-			const ch = input[i];
-			if (ch === "%" && i + 2 < input.length) {
-				const hex = input.slice(i + 1, i + 3);
-				if (isHexPair(hex)) {
-					output += "%" + hex.toUpperCase();
-					i += 2;
-					continue;
-				}
-			}
-			if (isAllowed(ch)) output += ch;
-			else {
-				const code = input.charCodeAt(i);
-				if (code < 128) output += BYTE_HEX[code];
-				else if (code < 55296 || code > 57343) output += percentEncodeNonAscii(code);
-				else if (code <= 56319 && i + 1 < input.length) {
-					const low = input.charCodeAt(i + 1);
-					if (low >= 56320 && low <= 57343) {
-						output += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
-						i++;
-					} else output += percentEncodeNonAscii(65533);
-				} else output += percentEncodeNonAscii(65533);
-			}
-		}
-		return output;
-	}
-	/**
-	* Encodes userinfo while preserving its RFC 3986 §3.2.1 literal characters.
-	* In particular, authority delimiters such as `@`, `/`, `?`, and `#` are data.
-	*
-	* @param {string} input
-	* @returns {string}
-	*/
-	function encodeUserinfo(input) {
-		return encodeComponent(input, isUserinfoCharacter);
-	}
-	/**
-	* Encodes query data using the RFC 3986 §3.4 grammar. A literal `#` must be
-	* escaped because it would otherwise begin the fragment component.
-	*
-	* @param {string} input
-	* @returns {string}
-	*/
-	function encodeQuery(input) {
-		return encodeComponent(input, isQueryFragmentCharacter);
-	}
-	/**
-	* Encodes fragment data using the RFC 3986 §3.5 grammar.
-	*
-	* @param {string} input
-	* @returns {string}
-	*/
-	function encodeFragment(input) {
-		return encodeComponent(input, isQueryFragmentCharacter);
-	}
-	function isEscapeSafe(cp) {
-		return cp >= 48 && cp <= 57 || cp >= 65 && cp <= 90 || cp >= 97 && cp <= 122 || cp === 42 || cp === 43 || cp === 45 || cp === 46 || cp === 47 || cp === 64 || cp === 95;
-	}
-	/**
 	* Normalizes the percent-encoding of a query or fragment component.
 	*
 	* Like `normalizePathEncoding`, but uses the query/fragment character set
@@ -7965,6 +7972,72 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		return output;
 	}
 	/**
+	* Percent-encodes a URI component using its RFC 3986 literal character set.
+	* Existing valid escapes are preserved and normalized to uppercase hex.
+	*
+	* @param {string} input
+	* @param {(value: string) => boolean} isAllowed
+	* @param {boolean} [allowNonAscii=false]
+	* @returns {string}
+	*/
+	function encodeComponent(input, isAllowed, allowNonAscii = false) {
+		let output = "";
+		for (let i = 0; i < input.length; i++) {
+			const ch = input[i];
+			if (ch === "%" && i + 2 < input.length) {
+				const hex = input.slice(i + 1, i + 3);
+				if (isHexPair(hex)) {
+					output += "%" + hex.toUpperCase();
+					i += 2;
+					continue;
+				}
+			}
+			if (isAllowed(ch)) output += ch;
+			else {
+				const code = input.charCodeAt(i);
+				if (code < 128) output += BYTE_HEX[code];
+				else if (code < 55296 || code > 57343) output += allowNonAscii ? ch : percentEncodeNonAscii(code);
+				else if (code <= 56319 && i + 1 < input.length) {
+					const low = input.charCodeAt(i + 1);
+					if (low >= 56320 && low <= 57343) {
+						output += allowNonAscii ? ch + input[i + 1] : percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+						i++;
+					} else output += allowNonAscii ? "�" : percentEncodeNonAscii(65533);
+				} else output += allowNonAscii ? "�" : percentEncodeNonAscii(65533);
+			}
+		}
+		return output;
+	}
+	/**
+	* Encodes userinfo while preserving its RFC 3986 §3.2.1 literal characters.
+	* In particular, authority delimiters such as `@`, `/`, `?`, and `#` are data.
+	*
+	* @param {string} input
+	* @returns {string}
+	*/
+	function encodeUserinfo(input) {
+		return encodeComponent(input, isUserinfoCharacter);
+	}
+	/**
+	* Encodes query data using the RFC 3986 §3.4 grammar. A literal `#` must be
+	* escaped because it would otherwise begin the fragment component.
+	*
+	* @param {string} input
+	* @returns {string}
+	*/
+	function encodeQuery(input) {
+		return encodeComponent(input, isQueryFragmentCharacter);
+	}
+	/**
+	* Encodes fragment data using the RFC 3986 §3.5 grammar.
+	*
+	* @param {string} input
+	* @returns {string}
+	*/
+	function encodeFragment(input) {
+		return encodeComponent(input, isQueryFragmentCharacter);
+	}
+	/**
 	* Escapes a component while preserving existing valid percent escapes.
 	*
 	* @param {string} input
@@ -7973,7 +8046,8 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	function escapePreservingEscapes(input) {
 		let output = "";
 		for (let i = 0; i < input.length; i++) {
-			if (input[i] === "%" && i + 2 < input.length) {
+			const ch = input[i];
+			if (ch === "%" && i + 2 < input.length) {
 				const hex = input.slice(i + 1, i + 3);
 				if (isHexPair(hex)) {
 					output += "%" + hex.toUpperCase();
@@ -7981,15 +8055,47 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 					continue;
 				}
 			}
-			output += escape(input[i]);
+			const code = input.charCodeAt(i);
+			if (code < 128) output += isEscapeSafe(code) ? ch : BYTE_HEX[code];
+			else if (code < 55296 || code > 57343) output += percentEncodeNonAscii(code);
+			else if (code <= 56319 && i + 1 < input.length) {
+				const low = input.charCodeAt(i + 1);
+				if (low >= 56320 && low <= 57343) {
+					output += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+					i++;
+				} else output += percentEncodeNonAscii(65533);
+			} else output += percentEncodeNonAscii(65533);
 		}
 		return output;
 	}
 	/**
+	* Rebuilds the bracketed form of a zoned IPv6 authority from the current
+	* `component.host` and its zone identifier (`component.ipv6Zone`), but only
+	* when they are consistent and describe a real zoned IPv6 literal that
+	* normalizes back to `component.host`. This validates the zone on use, so a
+	* caller-supplied `ipv6Zone` that does not match the host (or a host
+	* reassigned after `parse`) is never trusted and recomposition falls back to
+	* the normal path.
+	*
 	* @param {import('../types/index').URIComponent} component
 	* @returns {string|undefined}
 	*/
-	function recomposeAuthority(component) {
+	function recomposeZonedIPv6Host(component) {
+		const zone = component.ipv6Zone;
+		if (zone === void 0) return void 0;
+		const host = component.host;
+		const separator = host.indexOf("%");
+		if (separator === -1) return void 0;
+		const escaped = host.slice(0, separator) + "%25" + zone;
+		const derived = normalizeIPv6("[" + escaped + "]");
+		if (derived.isIPV6 === true && derived.host === host) return "[" + escaped + "]";
+	}
+	/**
+	* @param {import('../types/index').URIComponent} component
+	* @param {boolean} [allowNonAscii=false] - preserve non-ASCII IRI characters
+	* @returns {string|undefined}
+	*/
+	function recomposeAuthority(component, allowNonAscii = false) {
 		const uriTokens = [];
 		if (component.userinfo !== void 0) {
 			uriTokens.push(encodeUserinfo(component.userinfo));
@@ -7998,13 +8104,17 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		if (component.host !== void 0) {
 			let host = component.host;
 			if (!isIPv4(host)) {
-				let ipV6res = normalizeIPv6(host);
-				if (ipV6res.isIPV6 !== true && ipV6res.isIPVFuture !== true) {
-					host = normalizePercentEncoding(host, true);
-					ipV6res = normalizeIPv6(host);
+				const zonedHost = recomposeZonedIPv6Host(component);
+				if (zonedHost !== void 0) host = zonedHost;
+				else {
+					let ipV6res = normalizeIPv6(host);
+					if (ipV6res.isIPV6 !== true && ipV6res.isIPVFuture !== true) {
+						host = normalizePercentEncoding(host, true);
+						ipV6res = normalizeIPv6(host);
+					}
+					if (ipV6res.isIPV6 === true || ipV6res.isIPVFuture === true) host = `[${ipV6res.escapedHost}]`;
+					else host = encodeHost(host, false, allowNonAscii);
 				}
-				if (ipV6res.isIPV6 === true || ipV6res.isIPVFuture === true) host = `[${ipV6res.escapedHost}]`;
-				else host = reescapeHostDelimiters(host, false);
 			}
 			uriTokens.push(host);
 		}
@@ -8017,9 +8127,12 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		return uriTokens.length ? uriTokens.join("") : void 0;
 	}
 	module.exports = {
+		BYTE_HEX,
+		percentEncodeNonAscii,
 		nonSimpleDomain,
+		nonSimpleMailtoDomain,
 		recomposeAuthority,
-		reescapeHostDelimiters,
+		encodeHost,
 		normalizePercentEncoding,
 		normalizePathEncoding,
 		serializePathEncoding,
@@ -8037,7 +8150,7 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	};
 }));
 var require_schemes = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-	var { isUUID } = require_utils();
+	var { isUUID, BYTE_HEX, percentEncodeNonAscii, nonSimpleMailtoDomain } = require_utils();
 	var URN_REG = /^([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-./:;=@]|%[\da-f]{2})+)$/iu;
 	var supportedSchemeNames = [
 		"http",
@@ -8045,7 +8158,8 @@ var require_schemes = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		"ws",
 		"wss",
 		"urn",
-		"urn:uuid"
+		"urn:uuid",
+		"mailto"
 	];
 	/** @typedef {supportedSchemeNames[number]} SchemeName */
 	/**
@@ -8180,27 +8294,333 @@ var require_schemes = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		parse: wsParse,
 		serialize: wsSerialize
 	};
+	var wss = {
+		scheme: "wss",
+		domainHost: ws.domainHost,
+		parse: ws.parse,
+		serialize: ws.serialize
+	};
+	var urn = {
+		scheme: "urn",
+		parse: urnParse,
+		serialize: urnSerialize,
+		skipNormalize: true,
+		absolutePath: true
+	};
+	var urnuuid = {
+		scheme: "urn:uuid",
+		parse: urnuuidParse,
+		serialize: urnuuidSerialize,
+		skipNormalize: true
+	};
+	/**
+	* Allow-sets for `encodeWithAllow`, each a `{ all, table, allowNonAscii }`
+	* descriptor built by `allowSet`:
+	*
+	* - `LOCAL_PART` is the intersection of upstream uri-js's VCHAR and
+	*   NOT_PATH_NOSCHEME, minus ",": the serializer joins recipients with "," and
+	*   `mailtoParse` splits the path on it, so a comma left literal inside a local
+	*   part would silently become a recipient delimiter.
+	* - `HFNAME` is the qchar allow-set used for header names/values.
+	* - `DTEXT` is RFC 6068 dtext-no-obs restricted to characters that are also
+	*   safe in a URI path; `DTEXT_IRI` additionally permits non-ASCII for
+	*   `unicodeSupport`.
+	*/
+	var LOCAL_PART_ALLOWED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~!$'()*+=";
+	var HFNAME_ALLOWED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~!$'()*+,;:@";
+	var DTEXT_ALLOWED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~!$'()*+;:";
+	/**
+	* @typedef {Object} AllowSet
+	* @property {RegExp} all - matches a whole string needing no encoding at all.
+	* @property {Uint8Array} table - per-ASCII-code allow lookup for the slow path.
+	* @property {boolean} allowNonAscii - pass non-ASCII code points through (IRI).
+	*/
+	/**
+	* `all` deliberately excludes "%" and (for the IRI variant) surrogates, so any
+	* input needing escape normalization or surrogate repair falls to the slow path.
+	*
+	* @param {string} chars
+	* @param {boolean} [allowNonAscii=false]
+	* @returns {AllowSet}
+	*/
+	function allowSet(chars, allowNonAscii = false) {
+		const table = /* @__PURE__ */ new Uint8Array(128);
+		for (let i = 0; i < chars.length; i++) table[chars.charCodeAt(i)] = 1;
+		const escaped = chars.replace(/[\\\]^-]/gu, "\\$&");
+		const cls = allowNonAscii ? `[${escaped}]|[^\\0-\\x7F\\uD800-\\uDFFF]` : `[${escaped}]`;
+		return {
+			all: new RegExp(`^(?:${cls})*$`, "u"),
+			table,
+			allowNonAscii
+		};
+	}
+	var LOCAL_PART = allowSet(LOCAL_PART_ALLOWED);
+	var HFNAME = allowSet(HFNAME_ALLOWED);
+	var DTEXT = allowSet(DTEXT_ALLOWED);
+	var DTEXT_IRI = allowSet(DTEXT_ALLOWED, true);
+	var HEX_PAIR = /^[\da-f]{2}$/iu;
+	var MAILTO_DOMAIN_LITERAL = /^\[[\x21-\x5A\x5E-\x7E]*\]$/u;
+	var MAILTO_DOMAIN_ERROR = "URI mailto has an invalid recipient domain.";
+	var MAILTO_AUTHORITY_ERROR = "URI mailto must not have an authority component.";
+	var HAS_SURROGATE = /[\uD800-\uDFFF]/u;
+	/**
+	* @param {string} str
+	* @returns {string}
+	*/
+	function decodeHex(str) {
+		if (typeof str !== "string" || str.indexOf("%") === -1) return str;
+		try {
+			return decodeURIComponent(str);
+		} catch {
+			return str;
+		}
+	}
+	/**
+	* Replaces lone surrogates with U+FFFD, leaving valid pairs intact. Only called
+	* when `HAS_SURROGATE` matched, so the scan cost is not on the common path.
+	* (`String.prototype.toWellFormed` would do this natively but is Node 20+.)
+	*
+	* @param {string} input
+	* @returns {string}
+	*/
+	function replaceLoneSurrogates(input) {
+		let result = "";
+		for (let i = 0; i < input.length; i++) {
+			const code = input.charCodeAt(i);
+			if (code >= 55296 && code <= 56319 && i + 1 < input.length) {
+				const low = input.charCodeAt(i + 1);
+				if (low >= 56320 && low <= 57343) {
+					result += input[i] + input[i + 1];
+					i++;
+					continue;
+				}
+			}
+			result += code >= 55296 && code <= 57343 ? "�" : input[i];
+		}
+		return result;
+	}
+	/**
+	* Percent-encodes everything outside `set`, preserving existing valid escapes
+	* (uppercased) and repairing lone surrogates.
+	*
+	* ASCII uses `BYTE_HEX` rather than `encodeURIComponent`. That is equivalent
+	* only because every character `encodeURIComponent` leaves unescaped
+	* (`A-Za-z0-9-_.!~*'()`) is present in all of the allow-sets above, so no such
+	* character ever reaches the encode branch. Re-check if a set is narrowed.
+	*
+	* @param {string} input
+	* @param {AllowSet} set
+	* @returns {string}
+	*/
+	function encodeWithAllow(input, set) {
+		if (set.all.test(input)) return input;
+		const table = set.table;
+		let result = "";
+		for (let i = 0; i < input.length; i++) {
+			const code = input.charCodeAt(i);
+			if (code < 128) {
+				if (table[code] === 1) result += input[i];
+				else if (code === 37 && i + 2 < input.length && HEX_PAIR.test(input.slice(i + 1, i + 3))) {
+					result += "%" + input.slice(i + 1, i + 3).toUpperCase();
+					i += 2;
+				} else result += BYTE_HEX[code];
+				continue;
+			}
+			if (code < 55296 || code > 57343) {
+				result += set.allowNonAscii ? input[i] : percentEncodeNonAscii(code);
+				continue;
+			}
+			if (code <= 56319 && i + 1 < input.length) {
+				const low = input.charCodeAt(i + 1);
+				if (low >= 56320 && low <= 57343) {
+					result += set.allowNonAscii ? input[i] + input[i + 1] : percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+					i++;
+					continue;
+				}
+			}
+			result += set.allowNonAscii ? "�" : percentEncodeNonAscii(65533);
+		}
+		return result;
+	}
+	/**
+	* @param {string} domain
+	* @param {import('../types/index').Options} [options]
+	* @param {{error?:string}} [component]
+	* @returns {string}
+	*/
+	function mailtoNormalizeDomain(domain, options, component) {
+		const normalizedDomain = String(domain).toLowerCase();
+		if (MAILTO_DOMAIN_LITERAL.test(normalizedDomain)) return normalizedDomain;
+		if (normalizedDomain !== "" && !nonSimpleMailtoDomain(normalizedDomain)) return normalizedDomain;
+		try {
+			const parsedDomain = new URL("http://" + normalizedDomain);
+			if (parsedDomain.username || parsedDomain.password || parsedDomain.port || parsedDomain.pathname !== "/" || parsedDomain.search || parsedDomain.hash || !parsedDomain.hostname) throw new Error(MAILTO_DOMAIN_ERROR);
+			return options && options.unicodeSupport ? normalizedDomain : parsedDomain.hostname;
+		} catch {
+			if (component) component.error = component.error || MAILTO_DOMAIN_ERROR;
+			return normalizedDomain;
+		}
+	}
+	/**
+	* Percent-encodes everything in a recipient domain that is not `dtext-no-obs`
+	* (RFC 6068). Serialize-only: `mailtoNormalizeDomain` returns the domain
+	* verbatim when validation fails, and `MAILTO_DOMAIN_LITERAL` accepts the full
+	* RFC 5321 dcontent range (which includes "?", "#", "&" and "/"), so without
+	* this an attacker-supplied recipient could inject header fields or a fragment
+	* into the serialized URI. `mailtoParse` deliberately reports the raw domain
+	* instead, so it must not use this.
+	* @param {string} domain
+	* @param {import('../types/index').Options} [options]
+	* @returns {string}
+	*/
+	function mailtoEncodeDomain(domain, options) {
+		const set = options && options.unicodeSupport ? DTEXT_IRI : DTEXT;
+		if (domain.length > 1 && domain[0] === "[" && domain[domain.length - 1] === "]") return "[" + encodeWithAllow(domain.slice(1, -1), set) + "]";
+		return encodeWithAllow(domain, set);
+	}
+	/**
+	* @param {import('../types/index').URIComponent} component
+	* @param {import('../types/index').Options} options
+	* @returns {import('../types/index').URIComponent}
+	*/
+	function mailtoParse(component, options) {
+		const mailtoComponent = component;
+		let rawPath = mailtoComponent.path;
+		let rawQuery = mailtoComponent.query;
+		if (rawPath && HAS_SURROGATE.test(rawPath)) rawPath = replaceLoneSurrogates(rawPath);
+		if (rawQuery && HAS_SURROGATE.test(rawQuery)) rawQuery = replaceLoneSurrogates(rawQuery);
+		const to = rawPath ? rawPath.indexOf(",") === -1 ? [rawPath] : rawPath.split(",") : [];
+		mailtoComponent.path = void 0;
+		if (rawQuery) {
+			/** @type {Record<string,string>|null} */
+			let headers = null;
+			let start = 0;
+			while (start <= rawQuery.length) {
+				let end = rawQuery.indexOf("&", start);
+				if (end === -1) end = rawQuery.length;
+				const token = rawQuery.slice(start, end);
+				start = end + 1;
+				const eqIdx = token.indexOf("=");
+				if (eqIdx !== token.lastIndexOf("=")) {
+					mailtoComponent.error = mailtoComponent.error || "URI mailto has malformed header fields.";
+					continue;
+				}
+				const name = decodeHex(eqIdx === -1 ? token : token.slice(0, eqIdx));
+				const normalizedName = name.toLowerCase();
+				const value = eqIdx === -1 ? "" : token.slice(eqIdx + 1);
+				if (normalizedName === "to") {
+					const addrs = value.split(",");
+					for (let j = 0; j < addrs.length; j++) to.push(addrs[j]);
+					continue;
+				}
+				if (normalizedName === "subject") {
+					mailtoComponent.subject = decodeHex(value);
+					continue;
+				}
+				if (normalizedName === "body") {
+					mailtoComponent.body = decodeHex(value);
+					continue;
+				}
+				if (headers === null) headers = Object.create(null);
+				headers[name] = decodeHex(value);
+			}
+			if (headers !== null) mailtoComponent.headers = headers;
+		}
+		mailtoComponent.query = void 0;
+		if (to.length > 0 && (mailtoComponent.userinfo !== void 0 || mailtoComponent.host !== void 0 || mailtoComponent.port !== void 0)) {
+			mailtoComponent.userinfo = void 0;
+			mailtoComponent.host = void 0;
+			mailtoComponent.port = void 0;
+			mailtoComponent.error = mailtoComponent.error || MAILTO_AUTHORITY_ERROR;
+		}
+		for (let i = 0; i < to.length; i++) {
+			const rawAddr = to[i];
+			const atIdx = rawAddr.lastIndexOf("@");
+			if (atIdx < 0) {
+				mailtoComponent.error = mailtoComponent.error || MAILTO_DOMAIN_ERROR;
+				to[i] = decodeHex(rawAddr);
+				continue;
+			}
+			const local = decodeHex(rawAddr.slice(0, atIdx));
+			const domain = mailtoNormalizeDomain(decodeHex(rawAddr.slice(atIdx + 1)), options, mailtoComponent);
+			to[i] = local + "@" + domain;
+		}
+		if (to.length) mailtoComponent.to = to;
+		return mailtoComponent;
+	}
+	/**
+	* Encodes a decoded mailto header name. Unlike `encodeWithAllow`, a percent
+	* sign is always data here, even when followed by two hex digits. Preserving
+	* such a sequence as an existing escape would decode the name again on the
+	* next parse and could turn a generic header into `to`, `subject`, or `body`.
+	* @param {string} name
+	* @returns {string}
+	*/
+	function mailtoEncodeHeaderName(name) {
+		return encodeWithAllow(name.replace(/%/gu, "%25"), HFNAME);
+	}
+	/**
+	* @param {import('../types/index').URIComponent} component
+	* @param {import('../types/index').Options} options
+	* @returns {import('../types/index').URIComponent}
+	*/
+	function mailtoSerialize(component, options) {
+		const mailtoComponent = component;
+		const to = Array.isArray(mailtoComponent.to) ? mailtoComponent.to.slice() : [];
+		const sourceHeaders = mailtoComponent.headers && typeof mailtoComponent.headers === "object" ? Object.assign(Object.create(null), mailtoComponent.headers) : Object.create(null);
+		const headers = Object.create(null);
+		for (const name in sourceHeaders) {
+			const normalizedName = name.toLowerCase();
+			if (normalizedName === "to") {
+				const addrs = String(sourceHeaders[name]).split(",");
+				for (let i = 0; i < addrs.length; i++) to.push(addrs[i]);
+			} else if (normalizedName === "subject" || normalizedName === "body") headers[normalizedName] = sourceHeaders[name];
+			else headers[name] = sourceHeaders[name];
+		}
+		if (mailtoComponent.subject !== void 0) headers.subject = mailtoComponent.subject;
+		if (mailtoComponent.body !== void 0) headers.body = mailtoComponent.body;
+		mailtoComponent.headers = headers;
+		if (to.length) {
+			mailtoComponent.userinfo = void 0;
+			mailtoComponent.host = void 0;
+			mailtoComponent.port = void 0;
+			for (let i = 0; i < to.length; i++) {
+				const addr = String(to[i]);
+				const atIdx = addr.lastIndexOf("@");
+				const rawLocal = atIdx >= 0 ? addr.slice(0, atIdx) : addr;
+				const rawDomain = atIdx >= 0 ? addr.slice(atIdx + 1) : "";
+				const local = encodeWithAllow(rawLocal, LOCAL_PART);
+				const normalizedDomain = mailtoNormalizeDomain(decodeHex(rawDomain), options);
+				to[i] = local + "@" + mailtoEncodeDomain(normalizedDomain, options);
+			}
+			mailtoComponent.path = to.join(",");
+			options.skipEscape = true;
+		} else mailtoComponent.path = void 0;
+		let query = "";
+		let count = 0;
+		for (const name in headers) {
+			if (count++ !== 0) query += "&";
+			query += mailtoEncodeHeaderName(name) + "=" + encodeWithAllow(String(headers[name]), HFNAME);
+		}
+		if (count !== 0) mailtoComponent.query = query;
+		else mailtoComponent.headers = void 0;
+		return mailtoComponent;
+	}
 	var SCHEMES = {
 		http,
 		https,
 		ws,
-		wss: {
-			scheme: "wss",
-			domainHost: ws.domainHost,
-			parse: ws.parse,
-			serialize: ws.serialize
-		},
-		urn: {
-			scheme: "urn",
-			parse: urnParse,
-			serialize: urnSerialize,
-			skipNormalize: true
-		},
-		"urn:uuid": {
-			scheme: "urn:uuid",
-			parse: urnuuidParse,
-			serialize: urnuuidSerialize,
-			skipNormalize: true
+		wss,
+		urn,
+		"urn:uuid": urnuuid,
+		mailto: {
+			scheme: "mailto",
+			parse: mailtoParse,
+			serialize: mailtoSerialize,
+			domainHost: false,
+			unicodeSupport: true,
+			skipNormalize: true,
+			absolutePath: true
 		}
 	};
 	Object.setPrototypeOf(SCHEMES, null);
@@ -8219,7 +8639,7 @@ var require_schemes = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	};
 }));
 var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-	var { normalizeIPv6, removeDotSegments, removeDotSegmentsRelative, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, serializePathEncoding, normalizeQueryFragmentEncoding, encodeQuery, encodeFragment, reescapeHostDelimiters, isIPv4, nonSimpleDomain } = require_utils();
+	var { normalizeIPv6, removeDotSegments, removeDotSegmentsRelative, recomposeAuthority, normalizePercentEncoding, normalizePathEncoding, serializePathEncoding, normalizeQueryFragmentEncoding, encodeQuery, encodeFragment, encodeHost, isIPv4, nonSimpleDomain } = require_utils();
 	var { SCHEMES, getSchemeHandler } = require_schemes();
 	var VALID_SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*$/u;
 	var MALFORMED_SCHEME_ERROR = "URI scheme is malformed.";
@@ -8257,19 +8677,34 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	*/
 	function resolve(baseURI, relativeURI, options) {
 		const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
-		const { parsed: baseParsed, malformedAuthorityOrPort: baseMalformed, malformedPercentEncoding: baseMalformedPercentEncoding, malformedSchemeSpecific: baseMalformedSchemeSpecific, malformedHost: baseMalformedHost, malformedScheme: baseMalformedScheme } = parseWithStatus(baseURI, schemelessOptions);
-		const { parsed: relativeParsed, malformedAuthorityOrPort: relativeMalformed, malformedPercentEncoding: relativeMalformedPercentEncoding, malformedSchemeSpecific: relativeMalformedSchemeSpecific, malformedHost: relativeMalformedHost, malformedScheme: relativeMalformedScheme } = parseWithStatus(relativeURI, schemelessOptions);
-		if (baseMalformed || relativeMalformed || baseMalformedPercentEncoding || relativeMalformedPercentEncoding || baseMalformedSchemeSpecific || relativeMalformedSchemeSpecific || baseMalformedHost || relativeMalformedHost || baseMalformedScheme || relativeMalformedScheme) throw new Error(baseParsed.error || relativeParsed.error || "URI is malformed.");
+		const { parsed: baseParsed, malformedAuthorityOrPort: baseMalformed, malformedReferenceEdge: baseMalformedReferenceEdge, malformedPercentEncoding: baseMalformedPercentEncoding, malformedSchemeSpecific: baseMalformedSchemeSpecific, malformedHost: baseMalformedHost, malformedScheme: baseMalformedScheme } = parseWithStatus(baseURI, schemelessOptions);
+		const { parsed: relativeParsed, malformedAuthorityOrPort: relativeMalformed, malformedReferenceEdge: relativeMalformedReferenceEdge, malformedPercentEncoding: relativeMalformedPercentEncoding, malformedSchemeSpecific: relativeMalformedSchemeSpecific, malformedHost: relativeMalformedHost, malformedScheme: relativeMalformedScheme } = parseWithStatus(relativeURI, schemelessOptions);
+		if (baseMalformed || relativeMalformed || baseMalformedReferenceEdge || relativeMalformedReferenceEdge || baseMalformedPercentEncoding || relativeMalformedPercentEncoding || baseMalformedSchemeSpecific || relativeMalformedSchemeSpecific || baseMalformedHost || relativeMalformedHost || baseMalformedScheme || relativeMalformedScheme) throw new Error(baseParsed.error || relativeParsed.error || "URI is malformed.");
 		const resolved = resolveComponent(baseParsed, relativeParsed, schemelessOptions, true);
 		const resolvedSchemeHandler = getSchemeHandler(options && options.scheme || resolved.scheme);
 		const resolvedHost = resolved.host;
+		if ((resolved.scheme === "http" || resolved.scheme === "https") && !resolvedHost) throw new Error("HTTP URIs must have a host.");
 		const resolvedHostIsIP = resolvedHost !== void 0 && resolvedHost !== "" && (isIPv4(resolvedHost) || normalizeIPv6(resolvedHost).isIPV6);
 		if (hasForbiddenDomainHost(resolved, options || {}, resolvedSchemeHandler, resolvedHostIsIP)) throw new Error(MALFORMED_HOST_ERROR);
 		canonicalizeHost(resolved, options || {}, resolvedSchemeHandler, resolvedHostIsIP);
 		const encodedASCIIHost = resolvedHost && resolvedHost.indexOf("%") !== -1 && !/\P{ASCII}/u.test(resolvedHost);
 		if (resolved.error && !encodedASCIIHost) throw new Error(resolved.error);
 		schemelessOptions.skipEscape = true;
+		if (resolvedSchemeHandler && resolvedSchemeHandler.absolutePath) schemelessOptions.absolutePath = true;
 		return serialize(resolved, schemelessOptions);
+	}
+	/**
+	* Copies a host component together with its parse-time zone identifier (if
+	* any), so downstream recomposition does not re-derive an IPv6 zone from the
+	* ambiguous single-"%" component form. The zone is validated on use by
+	* `recomposeAuthority` rather than blindly trusted.
+	*
+	* @param {import('./types/index').URIComponent} target
+	* @param {import('./types/index').URIComponent} source
+	*/
+	function copyHost(target, source) {
+		target.host = source.host;
+		if (source.ipv6Zone !== void 0) target.ipv6Zone = source.ipv6Zone;
 	}
 	/**
 	* @param {import ('./types/index').URIComponent} base
@@ -8289,14 +8724,15 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		if (!options.tolerant && relative.scheme) {
 			target.scheme = relative.scheme;
 			target.userinfo = relative.userinfo;
-			target.host = relative.host;
+			copyHost(target, relative);
 			target.port = relative.port;
-			target.path = removeDotSegments(relative.path || "");
+			const relativeSchemeHandler = getSchemeHandler(relative.scheme);
+			target.path = relativeSchemeHandler && relativeSchemeHandler.absolutePath ? relative.path || "" : removeDotSegments(relative.path || "");
 			target.query = relative.query;
 		} else {
 			if (relative.userinfo !== void 0 || relative.host !== void 0 || relative.port !== void 0) {
 				target.userinfo = relative.userinfo;
-				target.host = relative.host;
+				copyHost(target, relative);
 				target.port = relative.port;
 				target.path = removeDotSegments(relative.path || "");
 				target.query = relative.query;
@@ -8317,7 +8753,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 					target.query = relative.query;
 				}
 				target.userinfo = base.userinfo;
-				target.host = base.host;
+				copyHost(target, base);
 				target.port = base.port;
 			}
 			target.scheme = base.scheme;
@@ -8344,6 +8780,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	function serialize(cmpts, opts) {
 		const component = {
 			host: cmpts.host,
+			ipv6Zone: cmpts.ipv6Zone,
 			scheme: cmpts.scheme,
 			userinfo: cmpts.userinfo,
 			port: cmpts.port,
@@ -8356,6 +8793,10 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			reference: cmpts.reference,
 			resourceName: cmpts.resourceName,
 			secure: cmpts.secure,
+			to: cmpts.to,
+			subject: cmpts.subject,
+			body: cmpts.body,
+			headers: cmpts.headers,
 			error: ""
 		};
 		const options = Object.assign({}, opts);
@@ -8374,7 +8815,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			component.scheme = validateScheme(component.scheme);
 			uriTokens.push(component.scheme, ":");
 		}
-		const authority = recomposeAuthority(component);
+		const authority = recomposeAuthority(component, options.unicodeSupport === true || Boolean(schemeHandler && schemeHandler.unicodeSupport));
 		if (authority !== void 0) {
 			if (options.reference !== "suffix") uriTokens.push("//");
 			uriTokens.push(authority);
@@ -8447,11 +8888,12 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	* @returns {boolean} whether host conversion failed
 	*/
 	function canonicalizeHost(parsed, options, schemeHandler, isIP) {
+		const bracketedIPLiteral = parsed.host && parsed.host[0] === "[" && parsed.host[parsed.host.length - 1] === "]";
 		if (hasForbiddenDomainHost(parsed, options, schemeHandler, isIP)) {
 			parsed.error = parsed.error || MALFORMED_HOST_ERROR;
 			return true;
 		}
-		if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed.host && !isIPLiteral(parsed.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
+		if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed.host && !isIPLiteral(parsed.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && !bracketedIPLiteral && nonSimpleDomain(parsed.host)) {
 			let url;
 			try {
 				url = new URL("http://" + parsed.host);
@@ -8493,7 +8935,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	/**
 	* @param {string} uri
 	* @param {import('./types/index').Options} [opts]
-	* @returns {{ parsed: import('./types/index').URIComponent, malformedAuthorityOrPort: boolean, malformedPercentEncoding: boolean, malformedSchemeSpecific: boolean, malformedHost: boolean, malformedScheme: boolean }}
+	* @returns {{ parsed: import('./types/index').URIComponent, malformedAuthorityOrPort: boolean, malformedReferenceEdge: boolean, malformedPercentEncoding: boolean, malformedSchemeSpecific: boolean, malformedHost: boolean, malformedScheme: boolean }}
 	*/
 	function parseWithStatus(uri, opts) {
 		const options = Object.assign({}, opts);
@@ -8508,6 +8950,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			fragment: void 0
 		};
 		let malformedAuthorityOrPort = false;
+		const malformedReferenceEdge = uri.length !== 0 && (uri.charCodeAt(0) <= 32 || uri.charCodeAt(uri.length - 1) <= 32);
 		let malformedPercentEncoding = false;
 		let malformedSchemeSpecific = false;
 		let malformedHost = false;
@@ -8537,6 +8980,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 				}
 			}
 		}
+		if (malformedReferenceEdge) parsed.error = parsed.error || "URI must not contain leading or trailing C0 controls or spaces.";
 		const matches = uri.match(URI_PARSE);
 		if (matches) {
 			parsed.scheme = matches[1];
@@ -8569,6 +9013,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 					isIP = ipv6result.isIPV6 || ipv6result.isIPVFuture === true;
 					malformedIPLiteral = hasIPLiteralBracket && (!bracketedIPLiteral || ipv6result.error === true);
 					parsed.host = isIP ? ipv6result.host : ipv6result.host.toLowerCase();
+					if (isIP && ipv6result.isIPV6 === true && parsed.host.indexOf("%") !== -1) parsed.ipv6Zone = parsed.host.slice(parsed.host.indexOf("%") + 1);
 					if (malformedIPLiteral) {
 						parsed.error = parsed.error || MALFORMED_HOST_ERROR;
 						malformedAuthorityOrPort = true;
@@ -8582,10 +9027,16 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 			if (options.reference && options.reference !== "suffix" && options.reference !== parsed.reference) parsed.error = parsed.error || "URI is not a " + options.reference + " reference.";
 			const schemeHandler = getSchemeHandler(options.scheme || parsed.scheme);
 			if (!malformedIPLiteral) malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP);
-			if (uri.indexOf("%") !== -1 && parsed.host !== void 0 && !malformedIPLiteral) {
-				let host = isIP ? parsed.host : normalizePercentEncoding(parsed.host, true);
-				if (!isIP) host = normalizePercentEncoding(host.toLowerCase());
-				parsed.host = isIP || options.scheme !== "null" ? reescapeHostDelimiters(host, isIP) : host;
+			if (parsed.host !== void 0 && !malformedIPLiteral) {
+				let host = parsed.host;
+				if (uri.indexOf("%") !== -1 && !isIP) {
+					host = normalizePercentEncoding(host, true);
+					host = normalizePercentEncoding(host.toLowerCase());
+				}
+				if (options.scheme !== "null") {
+					const allowNonAsciiHost = options.unicodeSupport === true || Boolean(schemeHandler && schemeHandler.unicodeSupport);
+					parsed.host = encodeHost(host, isIP, allowNonAsciiHost);
+				} else parsed.host = host;
 			}
 			if (!schemeHandler || schemeHandler && !schemeHandler.skipNormalize) {
 				if (parsed.path) parsed.path = normalizePathEncoding(parsed.path);
@@ -8600,6 +9051,7 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		return {
 			parsed,
 			malformedAuthorityOrPort,
+			malformedReferenceEdge,
 			malformedPercentEncoding,
 			malformedSchemeSpecific,
 			malformedHost,
@@ -8625,13 +9077,14 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	/**
 	* @param {string} uri
 	* @param {import('./types/index').Options} [opts]
-	* @returns {{ normalized: string, malformedAuthorityOrPort: boolean, malformedPercentEncoding: boolean, malformedSchemeSpecific: boolean, malformedHost: boolean, malformedScheme: boolean }}
+	* @returns {{ normalized: string, malformedAuthorityOrPort: boolean, malformedReferenceEdge: boolean, malformedPercentEncoding: boolean, malformedSchemeSpecific: boolean, malformedHost: boolean, malformedScheme: boolean }}
 	*/
 	function normalizeStringWithStatus(uri, opts) {
-		const { parsed, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = parseWithStatus(uri, opts);
+		const { parsed, malformedAuthorityOrPort, malformedReferenceEdge, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = parseWithStatus(uri, opts);
 		return {
-			normalized: malformedAuthorityOrPort || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? uri : serialize(parsed, opts),
+			normalized: malformedAuthorityOrPort || malformedReferenceEdge || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? uri : serialize(parsed, opts),
 			malformedAuthorityOrPort,
+			malformedReferenceEdge,
 			malformedPercentEncoding,
 			malformedSchemeSpecific,
 			malformedHost,
@@ -8651,8 +9104,8 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 		} catch {
 			return;
 		}
-		const { normalized, malformedAuthorityOrPort, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = normalizeStringWithStatus(value, opts);
-		return malformedAuthorityOrPort || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? void 0 : normalized;
+		const { normalized, malformedAuthorityOrPort, malformedReferenceEdge, malformedPercentEncoding, malformedSchemeSpecific, malformedHost, malformedScheme } = normalizeStringWithStatus(value, opts);
+		return malformedAuthorityOrPort || malformedReferenceEdge || malformedPercentEncoding || malformedSchemeSpecific || malformedHost || malformedScheme ? void 0 : normalized;
 	}
 	var fastUri = {
 		SCHEMES,
